@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { analyzeSignalGroup, generateSummary, SIGNAL_GROUPS, type SignalResult } from "@/lib/claude";
 import { getBand, MAX_SCORE } from "@/lib/signals";
 import { sendReportReadyEmail } from "@/lib/resend";
+import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 
 // Extend Vercel serverless timeout to 60s (max on Hobby plan).
 // With 3 parallel Claude calls of ~4 signals each, total time is ~15-25s.
@@ -59,6 +60,19 @@ export async function POST(req: Request) {
     await supabase.from("notification_requests").insert({ report_id: report.id, email });
   }
 
+  // ── Fetch real financial data from Screener.in ────────────────────────────
+  // This is the data-grounding step. Without it, Claude relies on training data
+  // which is unreliable for SME-listed, recently-IPO'd, or low-profile stocks.
+  const screenerData = await fetchScreenerData(symbol, exchange);
+  const dataContext = screenerData ? formatScreenerContext(screenerData) : "";
+
+  if (screenerData) {
+    // Update company name from Screener if more accurate
+    await supabase.from("reports")
+      .update({ company_name: screenerData.companyName })
+      .eq("id", report.id);
+  }
+
   // ── Parallel analysis ──────────────────────────────────────────────────────
   // Fire all 3 signal groups simultaneously. Each group saves its results to
   // the DB the moment it completes, so the UI sees progressive updates on polls.
@@ -67,7 +81,7 @@ export async function POST(req: Request) {
   try {
     await Promise.all(
       SIGNAL_GROUPS.map(group =>
-        analyzeSignalGroup(symbol, exchange, companyName, group)
+        analyzeSignalGroup(symbol, exchange, companyName, group, dataContext)
           .then(async (signals) => {
             allSignals.push(...signals);
             await persistSignals(supabase, report.id, signals);
@@ -84,7 +98,7 @@ export async function POST(req: Request) {
   const band = getBand(total_score);
   let summary = "";
   try {
-    summary = await generateSummary(symbol, exchange, companyName, allSignals, band.label, total_score, MAX_SCORE);
+    summary = await generateSummary(symbol, exchange, companyName, allSignals, band.label, total_score, MAX_SCORE, dataContext);
   } catch {
     // Non-fatal — report still complete without summary
   }

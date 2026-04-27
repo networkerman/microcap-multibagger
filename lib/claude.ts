@@ -44,11 +44,14 @@ RULES:
 5. Return ONLY valid JSON — no markdown, no preamble, no trailing text.`;
 
 // Scores a subset of signals for one company. Called in parallel for each group.
+// dataContext is pre-fetched financial data from Screener.in — when provided,
+// Claude MUST use these verified numbers rather than training-data guesses.
 export async function analyzeSignalGroup(
   symbol: string,
   exchange: string,
   companyName: string,
-  signalIds: readonly string[]
+  signalIds: readonly string[],
+  dataContext = ""
 ): Promise<SignalResult[]> {
   const signals = SIGNALS.filter(s => signalIds.includes(s.id)).map(s => ({
     id: s.id,
@@ -63,8 +66,12 @@ export async function analyzeSignalGroup(
     fail_example: s.fail,
   }));
 
-  const prompt = `Analyse: ${companyName} (${symbol}, ${exchange})
+  const dataSection = dataContext
+    ? `\n${dataContext}\n\nUse the verified data above as your primary source. Do not contradict these numbers.\n`
+    : "";
 
+  const prompt = `Analyse: ${companyName} (${symbol}, ${exchange})
+${dataSection}
 Score ONLY the following ${signals.length} signal(s). Return a JSON array — nothing else:
 [
   {
@@ -101,10 +108,12 @@ export async function generateSummary(
   signals: SignalResult[],
   band: string,
   total: number,
-  max: number
+  max: number,
+  dataContext = ""
 ): Promise<string> {
+  const dataSection = dataContext ? `\n${dataContext}\n` : "";
   const prompt = `${companyName} (${symbol}, ${exchange}) scored ${total}/${max} — ${band}.
-
+${dataSection}
 Signal scores:
 ${signals.map(s => `${s.signal_id} ${s.label}: ${s.score}/${s.max_score} — ${s.reasoning}`).join("\n")}
 
