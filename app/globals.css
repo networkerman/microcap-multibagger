@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes mmb-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes mmb-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.mmb-shimmer {
+  background: linear-gradient(90deg, #0c1d2c 25%, #1a3048 50%, #0c1d2c 75%) !important;
+  background-size: 200% 100% !important;
+  animation: mmb-shimmer 1.8s ease-in-out infinite;
+}
+
+.mmb-shimmer-primary {
+  background: linear-gradient(90deg, #0c1524 25%, #1c2e44 50%, #0c1524 75%) !important;
+  background-size: 200% 100% !important;
+  animation: mmb-shimmer 1.8s ease-in-out infinite;
+}
+
+.mmb-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: mmb-blink 1.2s ease-in-out infinite;
+  vertical-align: middle;
+  margin-right: 5px;
+}

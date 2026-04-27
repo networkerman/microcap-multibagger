@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SIGNALS, getBand } from "@/lib/signals";
+import { SIGNALS, getBand, MAX_SCORE } from "@/lib/signals";
 
 interface SignalResult {
   signal_id: string;
@@ -40,6 +40,7 @@ function pctColor(v: number, m: number): string {
 }
 
 function timeAgo(dateStr: string): string {
+  if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
@@ -66,11 +67,19 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
   const [copied, setCopied] = useState(false);
 
   const isAnalyzing = report.status === "analyzing";
-  const band = report.band ?? "INVESTIGATE";
-  const color = BAND_COLORS[band] ?? "#94a3b8";
+
+  // During analysis, compute live score from available signals (not report.total_score which is 0)
+  const liveScore = isAnalyzing
+    ? report.report_signals.reduce((a, s) => a + s.score, 0)
+    : report.total_score;
+
+  const scoredCount = report.report_signals.length;
+  const liveBand = getBand(liveScore);
+  const band = isAnalyzing ? (scoredCount > 0 ? liveBand.label : "") : (report.band ?? "INVESTIGATE");
+  const color = BAND_COLORS[band] ?? (isAnalyzing ? "#2e4a60" : "#94a3b8");
   const bg = BAND_BG[band] ?? "#0c1d2c";
-  const total = report.total_score;
-  const max = report.max_score ?? 42;
+
+  const max = report.max_score ?? MAX_SCORE;
   const analyzedAgo = timeAgo(report.analyzed_at);
   const isStale = report.expired;
 
@@ -87,8 +96,16 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
 
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 26 }}>
-        <div style={{ display: "inline-block", background: "#f59e0b18", border: "1px solid #f59e0b44", borderRadius: 20, padding: "4px 16px", fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>
-          MICROCAP MULTIBAGGER · FRAMEWORK v2.0
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "inline-block", background: "#f59e0b18", border: "1px solid #f59e0b44", borderRadius: 20, padding: "4px 16px", fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 2 }}>
+            MICROCAP MULTIBAGGER · FRAMEWORK v2.0
+          </div>
+          {isAnalyzing && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#022c11", border: "1px solid #22c55e44", borderRadius: 20, padding: "4px 12px" }}>
+              <span className="mmb-live-dot" />
+              <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 800, letterSpacing: 1.5 }}>LIVE</span>
+            </div>
+          )}
         </div>
         <h1 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 900, color: "#ffd700" }}>
           {report.company_name}
@@ -97,37 +114,41 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
           {report.symbol} · {report.exchange}
         </div>
 
-        {/* Action bar: timestamp + share + refresh */}
+        {/* Action bar */}
         <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-          {/* Timestamp pill */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: isStale ? "#f59e0b18" : "#0c1d2c",
-            border: `1px solid ${isStale ? "#f59e0b55" : "#1a2e40"}`,
-            borderRadius: 20, padding: "5px 14px",
-            color: isStale ? "#f59e0b" : "#5a7a94", fontSize: 12,
-          }}>
-            {isStale ? "⚠ " : "🕐 "}Analysed {analyzedAgo}
-            {isStale && <span style={{ color: "#f59e0b80" }}> · over 90 days old</span>}
-          </div>
+          {/* Timestamp pill — only when we have a date */}
+          {analyzedAgo && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: isStale ? "#f59e0b18" : "#0c1d2c",
+              border: `1px solid ${isStale ? "#f59e0b55" : "#1a2e40"}`,
+              borderRadius: 20, padding: "5px 14px",
+              color: isStale ? "#f59e0b" : "#5a7a94", fontSize: 12,
+            }}>
+              {isStale ? "⚠ " : "🕐 "}Analysed {analyzedAgo}
+              {isStale && <span style={{ color: "#f59e0b80" }}> · over 90 days old</span>}
+            </div>
+          )}
 
           {/* Share button */}
-          <button
-            onClick={copyLink}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: copied ? "#22c55e22" : "#0c1d2c",
-              border: `1px solid ${copied ? "#22c55e55" : "#1a2e40"}`,
-              borderRadius: 20, padding: "5px 14px",
-              color: copied ? "#22c55e" : "#38bdf8",
-              fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}
-          >
-            {copied ? "✓ Link copied!" : "⬆ Share report"}
-          </button>
+          {!isAnalyzing && (
+            <button
+              onClick={copyLink}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: copied ? "#22c55e22" : "#0c1d2c",
+                border: `1px solid ${copied ? "#22c55e55" : "#1a2e40"}`,
+                borderRadius: 20, padding: "5px 14px",
+                color: copied ? "#22c55e" : "#38bdf8",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              {copied ? "✓ Link copied!" : "⬆ Share report"}
+            </button>
+          )}
 
-          {/* Refresh button — always visible */}
-          {onRequestRefresh && (
+          {/* Refresh button */}
+          {onRequestRefresh && !isAnalyzing && (
             <button
               onClick={onRequestRefresh}
               style={{
@@ -144,45 +165,62 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
       </div>
 
       {/* Score banner */}
-      <div style={{ background: bg, border: `1px solid ${color}55`, borderRadius: 16, padding: "20px 24px", marginBottom: 22 }}>
+      <div style={{ background: bg, border: `1px solid ${color}55`, borderRadius: 16, padding: "20px 24px", marginBottom: 22, transition: "background 0.6s ease, border-color 0.6s ease" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontSize: 58, fontWeight: 900, color, lineHeight: 1 }}>{total}</span>
+              <span style={{ fontSize: 58, fontWeight: 900, color: scoredCount > 0 ? color : "#1a2e40", lineHeight: 1, transition: "color 0.6s ease" }}>
+                {liveScore}
+              </span>
               <span style={{ fontSize: 20, color: "#2e4a60", fontWeight: 700 }}>/ {max}</span>
             </div>
+            {isAnalyzing && (
+              <div style={{ color: "#3d5a73", fontSize: 12, marginTop: 4 }}>
+                {scoredCount === 0
+                  ? "Claude is researching signals…"
+                  : `${scoredCount} of 12 signals scored — updating live`}
+              </div>
+            )}
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ display: "inline-block", border: `2px solid ${color}`, borderRadius: 12, padding: "12px 28px", marginBottom: 8 }}>
-              <div style={{ color, fontWeight: 900, fontSize: 20, letterSpacing: 1.5 }}>{band}</div>
-            </div>
-            <div style={{ color: "#3d5a73", fontSize: 12, maxWidth: 210 }}>
-              {getBand(total).desc}
-            </div>
+            {band ? (
+              <>
+                <div style={{ display: "inline-block", border: `2px solid ${color}`, borderRadius: 12, padding: "12px 28px", marginBottom: 8, transition: "border-color 0.6s ease" }}>
+                  <div style={{ color, fontWeight: 900, fontSize: 20, letterSpacing: 1.5, transition: "color 0.6s ease" }}>{band}</div>
+                </div>
+                <div style={{ color: "#3d5a73", fontSize: 12, maxWidth: 210 }}>
+                  {isAnalyzing ? "Provisional — score updating as signals complete" : liveBand.desc}
+                </div>
+              </>
+            ) : (
+              <div style={{ border: "2px solid #1a2e40", borderRadius: 12, padding: "12px 28px" }}>
+                <div style={{ color: "#2e4a60", fontWeight: 700, fontSize: 13 }}>Scoring…</div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Progress bar */}
         <div style={{ marginTop: 18, height: 7, background: "#0c1d2c", borderRadius: 4, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${(total / max) * 100}%`, background: color, borderRadius: 4 }} />
+          <div style={{ height: "100%", width: `${(liveScore / max) * 100}%`, background: scoredCount > 0 ? color : "#1a2e40", borderRadius: 4, transition: "width 0.6s ease, background 0.6s ease" }} />
         </div>
 
         {/* Band chips */}
         <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
           {[
-            { r: "≥30", l: "STRONG BUY", c: "#22c55e", a: total >= 30 },
-            { r: "21–29", l: "WATCHLIST", c: "#f59e0b", a: total >= 21 && total < 30 },
-            { r: "14–20", l: "INVESTIGATE", c: "#f97316", a: total >= 14 && total < 21 },
-            { r: "<14", l: "AVOID", c: "#ef4444", a: total < 14 },
+            { r: "≥30", l: "STRONG BUY",  c: "#22c55e", a: liveScore >= 30 },
+            { r: "21–29", l: "WATCHLIST",  c: "#f59e0b", a: liveScore >= 21 && liveScore < 30 },
+            { r: "14–20", l: "INVESTIGATE",c: "#f97316", a: liveScore >= 14 && liveScore < 21 },
+            { r: "<14",   l: "AVOID",      c: "#ef4444", a: liveScore < 14 },
           ].map(b => (
-            <div key={b.l} style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.a ? b.c + "28" : "#0c1d2c", color: b.a ? b.c : "#2e4a60", border: `1px solid ${b.a ? b.c : "#1a2e40"}` }}>
+            <div key={b.l} style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.a ? b.c + "28" : "#0c1d2c", color: b.a ? b.c : "#2e4a60", border: `1px solid ${b.a ? b.c : "#1a2e40"}`, transition: "all 0.5s ease" }}>
               {b.r} · {b.l}
             </div>
           ))}
         </div>
       </div>
 
-      {/* AI Summary */}
+      {/* AI Summary — only when complete */}
       {report.summary && (
         <div style={{ background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
           <div style={{ color: "#38bdf8", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8 }}>AI INVESTMENT THESIS</div>
@@ -202,7 +240,7 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
           const primaryMax = 15;
           const c = pctColor(primaryTotal, primaryMax);
           return (
-            <div style={{ marginLeft: "auto", fontWeight: 800, color: c, fontSize: 13, flexShrink: 0 }}>
+            <div style={{ marginLeft: "auto", fontWeight: 800, color: primaryTotal > 0 ? c : "#2e4a60", fontSize: 13, flexShrink: 0, transition: "color 0.5s ease" }}>
               {primaryTotal}/{primaryMax}
             </div>
           );
@@ -226,12 +264,16 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
           const isPrimary = sig.primary === true;
 
           return (
-            <div key={sig.id} style={{
-              background: pending ? "#080e18" : (isPrimary ? "#0c1524" : "#0c1d2c"),
-              border: `1px solid ${pending ? "#0f1a28" : (isPrimary ? "#f59e0b33" : "#1a2e40")}`,
-              borderRadius: 12, marginBottom: 8, overflow: "hidden",
-              opacity: pending ? 0.5 : 1, transition: "opacity 0.4s ease",
-            }}>
+            <div
+              key={sig.id}
+              className={pending ? (isPrimary ? "mmb-shimmer-primary" : "mmb-shimmer") : ""}
+              style={{
+                background: pending ? undefined : (isPrimary ? "#0c1524" : "#0c1d2c"),
+                border: `1px solid ${pending ? "#1a2e4044" : (isPrimary ? "#f59e0b33" : "#1a2e40")}`,
+                borderRadius: 12, marginBottom: 8, overflow: "hidden",
+                transition: "border-color 0.5s ease",
+              }}
+            >
               {/* Row */}
               <div
                 onClick={() => !pending && setExpanded(p => ({ ...p, [sig.id]: !p[sig.id] }))}
@@ -244,32 +286,32 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: 800, color: c,
                   border: `1px solid ${isPrimary ? "#f59e0b44" : c + "33"}`,
-                  flexShrink: 0,
+                  flexShrink: 0, transition: "color 0.5s ease, border-color 0.5s ease",
                 }}>
-                  {pending ? "…" : sig.id}
+                  {pending ? sig.id : sig.id}
                 </div>
                 {/* Label + bar */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ color: pending ? "#2e4a60" : (isPrimary ? "#e8d5a3" : "#c8d8e8"), fontWeight: 600, fontSize: 13 }}>{sig.label}</span>
+                      <span style={{ color: pending ? "#2e4a60" : (isPrimary ? "#e8d5a3" : "#c8d8e8"), fontWeight: 600, fontSize: 13, transition: "color 0.5s ease" }}>{sig.label}</span>
                       {isPrimary && !pending && (
                         <span style={{ background: "#f59e0b22", border: "1px solid #f59e0b44", borderRadius: 4, padding: "1px 6px", fontSize: 9, color: "#f59e0b", fontWeight: 800, letterSpacing: 1 }}>
                           PRIMARY
                         </span>
                       )}
                       {pending && (
-                        <span style={{ background: "#0f1a28", border: "1px solid #1a2e40", borderRadius: 4, padding: "1px 6px", fontSize: 9, color: "#2e4a60", fontWeight: 700 }}>
+                        <span style={{ background: "transparent", border: "1px solid #1a2e4066", borderRadius: 4, padding: "1px 6px", fontSize: 9, color: "#2e4a60", fontWeight: 700 }}>
                           RESEARCHING…
                         </span>
                       )}
                     </div>
-                    <span style={{ color: c, fontWeight: 700, fontSize: 13, marginLeft: 8, flexShrink: 0 }}>
+                    <span style={{ color: c, fontWeight: 700, fontSize: 13, marginLeft: 8, flexShrink: 0, transition: "color 0.5s ease" }}>
                       {pending ? `—/${sig.max}` : `${sc}/${sig.max}`}
                     </span>
                   </div>
                   <div style={{ height: 4, background: "#0a1824", borderRadius: 2, overflow: "hidden" }}>
-                    {!pending && <div style={{ height: "100%", width: `${sig.max > 0 ? (sc / sig.max) * 100 : 0}%`, background: c, borderRadius: 2 }} />}
+                    {!pending && <div style={{ height: "100%", width: `${sig.max > 0 ? (sc / sig.max) * 100 : 0}%`, background: c, borderRadius: 2, transition: "width 0.5s ease" }} />}
                   </div>
                 </div>
                 {!pending && <div style={{ color: "#1a2e40", fontSize: 16, marginLeft: 6, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>▼</div>}

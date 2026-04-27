@@ -4,8 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ReportView from "@/components/ReportView";
 import ContactCapture from "@/components/ContactCapture";
+import { MAX_SCORE } from "@/lib/signals";
 
 type Status = "loading" | "no-report" | "analyzing" | "has-report";
+
+// Skeleton report shown immediately when analysis starts (before first poll returns)
+function makeSkeletonReport(symbol: string, exchange: string, companyName: string) {
+  return {
+    id: "", symbol, exchange, company_name: companyName,
+    status: "analyzing", total_score: 0, max_score: MAX_SCORE,
+    band: "", summary: "", analyzed_at: "", expires_at: "",
+    expired: false, report_signals: [] as any[],
+  };
+}
 
 export default function StockPage() {
   const params = useParams();
@@ -35,11 +46,9 @@ export default function StockPage() {
       }
       setStatus("no-report");
     } else if (data.status === "analyzing") {
-      // Show partial signals immediately (some groups may already be done)
       setReport(data);
       setCompanyName(data.company_name ?? companyName);
       setStatus("analyzing");
-      // Poll every 2s while analyzing
       pollTimer.current = setTimeout(() => fetchReport(true), 2000);
     } else {
       setReport(data);
@@ -67,7 +76,10 @@ export default function StockPage() {
         const err = await res.json();
         throw new Error(err.error ?? "Analysis failed");
       }
+      // 202 returned immediately — show skeleton and start polling
       setShowRefreshOverlay(false);
+      setSubmitting(false);
+      setReport(null); // will show skeleton
       setStatus("analyzing");
       pollTimer.current = setTimeout(() => fetchReport(true), 2000);
     } catch (e: any) {
@@ -76,10 +88,10 @@ export default function StockPage() {
     }
   };
 
-  // Primary signal IDs for the animated loading indicator
-  const PRIMARY = ["S3", "S4", "S10"];
-  const ALL_SIGNALS = ["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10","S11","S12"];
-  const scoredIds = new Set((report?.report_signals ?? []).map((s: any) => s.signal_id));
+  // Report to pass to ReportView during analysis — skeleton if no data yet
+  const liveReport = status === "analyzing"
+    ? (report ?? makeSkeletonReport(symbol, exchange, companyName))
+    : report;
 
   return (
     <div style={{ background: "#060f18", minHeight: "100vh", fontFamily: "'Inter','Segoe UI',sans-serif", padding: "32px 16px", color: "#e2e8f0" }}>
@@ -96,49 +108,9 @@ export default function StockPage() {
           <div style={{ textAlign: "center", padding: "60px 0", color: "#3d5a73" }}>Loading…</div>
         )}
 
-        {/* ── Analyzing state: shows partial report as signals come in ── */}
-        {status === "analyzing" && (
-          <>
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
-              <div style={{ display: "inline-block", background: "#f59e0b18", border: "1px solid #f59e0b44", borderRadius: 20, padding: "4px 16px", fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>
-                ANALYSIS IN PROGRESS
-              </div>
-              <div style={{ color: "#e2e8f0", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{companyName}</div>
-              <div style={{ color: "#3d5a73", fontSize: 13, marginBottom: 20 }}>
-                Claude is researching and scoring signals — results appear as each group completes
-              </div>
-
-              {/* Signal progress tiles */}
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
-                {ALL_SIGNALS.map(id => {
-                  const done = scoredIds.has(id);
-                  const isPrimary = PRIMARY.includes(id);
-                  return (
-                    <div key={id} style={{
-                      width: 44, height: 44, borderRadius: 9,
-                      background: done ? (isPrimary ? "#0f1f35" : "#0c1d2c") : "#060f18",
-                      border: `1.5px solid ${done ? (isPrimary ? "#f59e0b" : "#22c55e") : "#1a2e40"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: done ? (isPrimary ? "#f59e0b" : "#22c55e") : "#2e4a60",
-                      fontSize: 11, fontWeight: 800,
-                      transition: "all 0.4s ease",
-                    }}>
-                      {done ? "✓" : id}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ color: "#2e4a60", fontSize: 12 }}>
-                {scoredIds.size}/12 signals scored · We'll email you when complete
-              </div>
-            </div>
-
-            {/* Show partial report below the progress indicator */}
-            {report && (report.report_signals ?? []).length > 0 && (
-              <ReportView report={{ ...report, status: "analyzing" }} />
-            )}
-          </>
+        {/* Analyzing: show live ReportView — signals appear as Claude finishes each group */}
+        {status === "analyzing" && liveReport && (
+          <ReportView report={liveReport} />
         )}
 
         {status === "no-report" && (
