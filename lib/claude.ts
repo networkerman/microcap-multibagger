@@ -1,9 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SIGNALS, getBand, MAX_SCORE, type Signal } from "./signals";
+import { SIGNALS, getBand, MAX_SCORE } from "./signals";
 
-function getClient() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-}
+// Three parallel groups. Group A (primary signals) runs first conceptually,
+// but all three are fired simultaneously. Each resolves independently and
+// is persisted to the DB as soon as it completes, giving the UI progressive data.
+export const SIGNAL_GROUPS = [
+  ["S3", "S4", "S10"],              // A — Primary (MOAT, OPM, Exponential)
+  ["S1", "S2", "S9", "S12"],        // B — Financial/market visibility
+  ["S5", "S6", "S7", "S8", "S11"], // C — Qualitative
+] as const;
 
 export interface SignalResult {
   signal_id: string;
@@ -22,32 +27,30 @@ export interface AnalysisResult {
   summary: string;
 }
 
-function buildSystemPrompt(): string {
-  return `You are an expert Indian stock market analyst specializing in microcap and smallcap stocks listed on NSE and BSE.
-You apply the Microcap Multibagger Framework — a 12-signal scoring system designed to identify high-conviction, policy-driven, high-growth smallcaps.
-
-Your task: Given a stock name and symbol, research it thoroughly and score each of the 12 signals. Be honest, rigorous, and conservative.
-A score of 3 should be genuinely rare. Base scores only on publicly verifiable data.
-
-Key sources you must check:
-- BSE/NSE exchange filings (screener.in, bseindia.com, nseindia.com)
-- Company annual reports and investor presentations
-- Screener.in for financial ratios (ROCE, OPM, D/E, promoter holding, pledging)
-- CRISIL/ICRA/India Ratings press releases for credit ratings
-- Glassdoor and LinkedIn for employee signals
-- NITI Aayog, PLI scheme documents for sector tailwinds
-
-CRITICAL RULES:
-1. If S10 (Exponential Market) scores 3, S1 (Sector Tailwind) must also score 3.
-2. Score conservatively — when in doubt, score lower.
-3. Never fabricate financial data. If you cannot verify a metric, state that and score accordingly.
-4. For each signal, cite the specific source where you found the data.
-
-Return ONLY valid JSON matching the exact schema provided. No markdown, no preamble.`;
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
-function buildUserPrompt(symbol: string, exchange: string, companyName: string): string {
-  const signalDefs = SIGNALS.map(s => ({
+const SYSTEM = `You are an expert Indian stock market analyst specialising in microcap and smallcap stocks on NSE and BSE.
+You apply the Microcap Multibagger Framework — a signal-based scoring system to find policy-driven, high-growth smallcaps.
+
+Sources to check: screener.in, bseindia.com, nseindia.com, CRISIL/ICRA press releases, Glassdoor, LinkedIn, NITI Aayog documents, Budget speeches.
+
+RULES:
+1. If S10 scores ≥3, S1 must also score 3.
+2. Score conservatively. When in doubt, score lower.
+3. Never fabricate data. If unverifiable, say so and score accordingly.
+4. Cite a specific source for every signal score.
+5. Return ONLY valid JSON — no markdown, no preamble, no trailing text.`;
+
+// Scores a subset of signals for one company. Called in parallel for each group.
+export async function analyzeSignalGroup(
+  symbol: string,
+  exchange: string,
+  companyName: string,
+  signalIds: readonly string[]
+): Promise<SignalResult[]> {
+  const signals = SIGNALS.filter(s => signalIds.includes(s.id)).map(s => ({
     id: s.id,
     label: s.label,
     max: s.max,
@@ -60,63 +63,59 @@ function buildUserPrompt(symbol: string, exchange: string, companyName: string):
     fail_example: s.fail,
   }));
 
-  return `Analyse this Indian listed company using the Microcap Multibagger Framework:
+  const prompt = `Analyse: ${companyName} (${symbol}, ${exchange})
 
-Company: ${companyName}
-Symbol: ${symbol}
-Exchange: ${exchange}
+Score ONLY the following ${signals.length} signal(s). Return a JSON array — nothing else:
+[
+  {
+    "signal_id": "S3",
+    "label": "MOAT & Entry Barriers",
+    "score": <integer 0 to max>,
+    "max_score": 5,
+    "reasoning": "<2-4 sentences with specific verifiable data and sources>",
+    "sources": ["<source name or URL>"]
+  }
+  ...
+]
 
-Score each of the 12 signals below. Return a JSON object with this exact structure:
-{
-  "signals": [
-    {
-      "signal_id": "S1",
-      "label": "Sector Tailwind",
-      "score": <integer 0 to max>,
-      "max_score": 3,
-      "reasoning": "<2-4 sentences citing specific data points and sources>",
-      "sources": ["<specific URL or document name>"]
-    },
-    ... (all 12 signals)
-  ],
-  "summary": "<3-5 sentence investment thesis summary covering the strongest signals, biggest risks, and overall conviction level>"
-}
+Signals to score:
+${JSON.stringify(signals, null, 2)}`;
 
-Signal definitions:
-${JSON.stringify(signalDefs, null, 2)}
-
-Important: Apply the S10→S1 auto-score rule if applicable.`;
-}
-
-export async function analyzeStock(
-  symbol: string,
-  exchange: string,
-  companyName: string
-): Promise<AnalysisResult> {
   const message = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 8000,
-    system: buildSystemPrompt(),
-    messages: [
-      { role: "user", content: buildUserPrompt(symbol, exchange, companyName) }
-    ],
+    max_tokens: 3000,
+    system: SYSTEM,
+    messages: [{ role: "user", content: prompt }],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
-
-  // Strip any accidental markdown fences
+  const text = message.content[0].type === "text" ? message.content[0].text : "[]";
   const json = text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-  const parsed = JSON.parse(json);
+  return JSON.parse(json) as SignalResult[];
+}
 
-  const signals: SignalResult[] = parsed.signals;
-  const total_score = signals.reduce((a, s) => a + s.score, 0);
-  const band = getBand(total_score);
+// Generates a 3-5 sentence summary once all signals are scored.
+export async function generateSummary(
+  symbol: string,
+  exchange: string,
+  companyName: string,
+  signals: SignalResult[],
+  band: string,
+  total: number,
+  max: number
+): Promise<string> {
+  const prompt = `${companyName} (${symbol}, ${exchange}) scored ${total}/${max} — ${band}.
 
-  return {
-    signals,
-    total_score,
-    max_score: MAX_SCORE,
-    band: band.label,
-    summary: parsed.summary,
-  };
+Signal scores:
+${signals.map(s => `${s.signal_id} ${s.label}: ${s.score}/${s.max_score} — ${s.reasoning}`).join("\n")}
+
+Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks, and overall conviction. Be specific and direct. Return plain text only.`;
+
+  const message = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 400,
+    system: SYSTEM,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  return message.content[0].type === "text" ? message.content[0].text.trim() : "";
 }

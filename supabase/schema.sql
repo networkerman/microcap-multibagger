@@ -46,10 +46,15 @@ create table if not exists report_signals (
   max_score   integer not null,
   reasoning   text,
   sources     text[],
-  created_at  timestamptz default now()
+  created_at  timestamptz default now(),
+  unique (report_id, signal_id)  -- needed for upsert during parallel group saves
 );
 
 create index if not exists report_signals_report_idx on report_signals (report_id);
+
+-- Migration: add unique constraint if table already exists without it
+alter table report_signals drop constraint if exists report_signals_report_id_signal_id_key;
+alter table report_signals add constraint report_signals_report_id_signal_id_key unique (report_id, signal_id);
 
 -- Notification queue
 create table if not exists notification_requests (

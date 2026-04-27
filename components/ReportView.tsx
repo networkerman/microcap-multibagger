@@ -65,7 +65,8 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
 
-  const band = report.band;
+  const isAnalyzing = report.status === "analyzing";
+  const band = report.band ?? "INVESTIGATE";
   const color = BAND_COLORS[band] ?? "#94a3b8";
   const bg = BAND_BG[band] ?? "#0c1d2c";
   const total = report.total_score;
@@ -218,21 +219,23 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
 
         {SIGNALS.map(sig => {
           const result = signalMap.get(sig.id);
+          const pending = !result && isAnalyzing;
           const sc = result?.score ?? 0;
-          const c = pctColor(sc, sig.max);
+          const c = pending ? "#1a2e40" : pctColor(sc, sig.max);
           const isOpen = expanded[sig.id];
           const isPrimary = sig.primary === true;
 
           return (
             <div key={sig.id} style={{
-              background: isPrimary ? "#0c1524" : "#0c1d2c",
-              border: `1px solid ${isPrimary ? "#f59e0b33" : "#1a2e40"}`,
+              background: pending ? "#080e18" : (isPrimary ? "#0c1524" : "#0c1d2c"),
+              border: `1px solid ${pending ? "#0f1a28" : (isPrimary ? "#f59e0b33" : "#1a2e40")}`,
               borderRadius: 12, marginBottom: 8, overflow: "hidden",
+              opacity: pending ? 0.5 : 1, transition: "opacity 0.4s ease",
             }}>
               {/* Row */}
               <div
-                onClick={() => setExpanded(p => ({ ...p, [sig.id]: !p[sig.id] }))}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", userSelect: "none" }}
+                onClick={() => !pending && setExpanded(p => ({ ...p, [sig.id]: !p[sig.id] }))}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: pending ? "default" : "pointer", userSelect: "none" }}
               >
                 {/* Badge */}
                 <div style={{
@@ -243,26 +246,33 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
                   border: `1px solid ${isPrimary ? "#f59e0b44" : c + "33"}`,
                   flexShrink: 0,
                 }}>
-                  {sig.id}
+                  {pending ? "…" : sig.id}
                 </div>
                 {/* Label + bar */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ color: isPrimary ? "#e8d5a3" : "#c8d8e8", fontWeight: 600, fontSize: 13 }}>{sig.label}</span>
-                      {isPrimary && (
+                      <span style={{ color: pending ? "#2e4a60" : (isPrimary ? "#e8d5a3" : "#c8d8e8"), fontWeight: 600, fontSize: 13 }}>{sig.label}</span>
+                      {isPrimary && !pending && (
                         <span style={{ background: "#f59e0b22", border: "1px solid #f59e0b44", borderRadius: 4, padding: "1px 6px", fontSize: 9, color: "#f59e0b", fontWeight: 800, letterSpacing: 1 }}>
                           PRIMARY
                         </span>
                       )}
+                      {pending && (
+                        <span style={{ background: "#0f1a28", border: "1px solid #1a2e40", borderRadius: 4, padding: "1px 6px", fontSize: 9, color: "#2e4a60", fontWeight: 700 }}>
+                          RESEARCHING…
+                        </span>
+                      )}
                     </div>
-                    <span style={{ color: c, fontWeight: 700, fontSize: 13, marginLeft: 8, flexShrink: 0 }}>{sc}/{sig.max}</span>
+                    <span style={{ color: c, fontWeight: 700, fontSize: 13, marginLeft: 8, flexShrink: 0 }}>
+                      {pending ? `—/${sig.max}` : `${sc}/${sig.max}`}
+                    </span>
                   </div>
                   <div style={{ height: 4, background: "#0a1824", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${sig.max > 0 ? (sc / sig.max) * 100 : 0}%`, background: c, borderRadius: 2 }} />
+                    {!pending && <div style={{ height: "100%", width: `${sig.max > 0 ? (sc / sig.max) * 100 : 0}%`, background: c, borderRadius: 2 }} />}
                   </div>
                 </div>
-                <div style={{ color: "#1a2e40", fontSize: 16, marginLeft: 6, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>▼</div>
+                {!pending && <div style={{ color: "#1a2e40", fontSize: 16, marginLeft: 6, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none", flexShrink: 0 }}>▼</div>}
               </div>
 
               {/* Expanded */}

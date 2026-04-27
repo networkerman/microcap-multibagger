@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
 // GET /api/report?symbol=UNIVASTU&exchange=NSE
-// Returns the cached report if it exists and is not expired (90 days).
+// Returns the report with whatever signals are available — including partial
+// results during active analysis. The UI uses the status field to know
+// whether to keep polling.
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get("symbol")?.toUpperCase();
@@ -21,7 +23,6 @@ export async function GET(req: Request) {
 
   if (!report) return NextResponse.json(null);
 
-  // Expired reports are surfaced but flagged so UI can prompt for refresh
   const expired = report.expires_at && new Date(report.expires_at) < new Date();
   return NextResponse.json({ ...report, expired });
 }
