@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SIGNALS, getBand, MAX_SCORE, type Signal } from "./signals";
 
-const client = new Anthropic();
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export interface SignalResult {
   signal_id: string;
@@ -91,7 +93,7 @@ export async function analyzeStock(
   exchange: string,
   companyName: string
 ): Promise<AnalysisResult> {
-  const message = await client.messages.create({
+  const message = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8000,
     system: buildSystemPrompt(),
