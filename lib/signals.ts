@@ -2,6 +2,7 @@ export interface Signal {
   id: string;
   label: string;
   max: number;
+  primary?: boolean;  // true for the 3 highest-weight signals
   what: string;
   question: string;
   source: string;
@@ -33,24 +34,24 @@ export const SIGNALS: Signal[] = [
     scoring: { 3: "Confirmed OB >2x Mcap", 2: "OB 1–2x Mcap, confirmed", 1: "OB <1x or capacity utilisation proxy used", 0: "No order book / product company with low utilisation" }
   },
   {
-    id: "S3", label: "Product / Service Quality", max: 3,
-    what: "Government or Tier-1 clients with repeat orders, hard-to-replicate product or process, internationally recognised certifications. The moat must be defensible against new entrants.",
-    question: "Are clients Tier-1 or government? Is the moat hard to replicate?",
-    source: "Company website client list, certifications page, annual report, RDSO/API/TPN approvals",
-    pass: "Integra Engineering: Alstom + Siemens Mobility clients, EN 15085 CL-1 certification",
-    fail: "Generic civil contractor with no differentiator, commodity trader",
-    note: "Mass-life-impact products (S11) score higher here — the bigger the problem solved, the harder to replicate",
-    scoring: { 3: "Tier-1/Govt clients + certified moat + repeat orders", 2: "Govt clients, some repeat, basic certification", 1: "One-off orders, no certification", 0: "Commodity / no differentiation" }
+    id: "S3", label: "MOAT & Entry Barriers", max: 5, primary: true,
+    what: "Government or Tier-1 clients with repeat orders, hard-to-replicate product or process, internationally recognised certifications, and high switching costs. The moat must be defensible: ask — if a well-funded competitor entered tomorrow, how long would it take to match this company? Low competition intensity is a strong indicator.",
+    question: "Are clients Tier-1 or government? Is the moat certified and hard to replicate? Is competition low?",
+    source: "Company website client list, certifications page, annual report, RDSO/API/TPN approvals, competitive landscape from DRHP",
+    pass: "Integra Engineering: Alstom + Siemens Mobility clients, EN 15085 CL-1 certification, 3–5 yr supplier approval cycles",
+    fail: "Generic civil contractor with no differentiator, commodity trader, easily replicable service",
+    note: "PRIMARY SIGNAL (max 5). Mass-life-impact products (S11) score higher here — the bigger the problem solved, the harder to replicate. Entry barriers include: regulatory approvals, certifications, long client approval cycles, proprietary process, network effects.",
+    scoring: { 5: "Monopoly/duopoly in niche + multi-yr certified supplier to Tier-1/Govt + zero realistic near-term competition", 4: "Tier-1/Govt clients + hard moat (certified, regulatory, process) + high switching cost + few credible competitors", 3: "Tier-1/Govt clients + certified moat + repeat orders", 2: "Govt clients, some repeat, basic certification", 1: "One-off orders, no certification", 0: "Commodity / no differentiation / easily replicable" }
   },
   {
-    id: "S4", label: "Strong Financials", max: 3,
-    what: "ROCE, OPM, OCF, debt levels, PEG — combined financial health picture. Trend direction matters as much as absolute levels. A company improving from 12% to 18% ROCE is more interesting than one at a static 20%.",
-    question: "ROCE >15%, OPM >5-10%, positive OCF, low debt, PEG <2?",
-    source: "Screener.in quarterly results, annual report cash flow statement, Tijori Finance",
-    pass: "Univastu India: ROCE 26.6%, OPM 14.6%, positive OCF, D/E 0.13",
-    fail: "PAT went negative, or PAT declining 3 consecutive quarters",
-    note: "OPM >5% acceptable if growth >50%. D/E <1.5 acceptable if debt is strategic for capacity expansion.",
-    scoring: { 3: "All criteria met + improving trend", 2: "Most criteria met — 1 metric slightly below threshold", 1: "1–2 weak metrics but trajectory improving", 0: "PAT negative or D/E >1.5 with no strategic justification" }
+    id: "S4", label: "OPM & Financial Strength", max: 5, primary: true,
+    what: "Operating Profit Margin (OPM) is the primary lens — high and expanding OPM signals pricing power, moat, and operational leverage. Combine with ROCE, OCF, debt levels, and revenue growth trajectory. A company with OPM >15% growing at >40% YoY is extremely rare and should score maximum.",
+    question: "OPM >10%? ROCE >15%? Revenue growing >30% YoY? Positive OCF? D/E <1.5?",
+    source: "Screener.in quarterly results (OPM trend), annual report cash flow statement, Tijori Finance, BSE quarterly filings",
+    pass: "Univastu India: ROCE 26.6%, OPM 14.6%, positive OCF, D/E 0.13, revenue 3x in 3 years",
+    fail: "PAT went negative, OPM declining 3 consecutive quarters, or D/E >2 with no strategic justification",
+    note: "PRIMARY SIGNAL (max 5). OPM trend is more important than absolute level. OPM >5% acceptable if revenue growth >50%. Watch for working capital deterioration even when PAT looks good.",
+    scoring: { 5: "OPM >15% + ROCE >25% + revenue growing >50% YoY + positive OCF + D/E <0.5, all improving", 4: "OPM >10% + ROCE >20% + strong revenue growth >30% + positive OCF + low debt, improving trend", 3: "All core criteria met + improving trend (ROCE >15%, OPM >8%)", 2: "Most criteria met — 1 metric slightly below threshold", 1: "1–2 weak metrics but trajectory improving", 0: "PAT negative or OPM declining or D/E >1.5 with no strategic justification" }
   },
   {
     id: "S5", label: "Promoter Quality & Connections", max: 3,
@@ -103,14 +104,14 @@ export const SIGNALS: Signal[] = [
     scoring: { 3: "PEG <1.0, P/E <20x on strong growth", 2: "PEG 1.0–1.5, P/E <30x", 1: "PEG 1.5–2.0 or P/E 30–50x", 0: "PEG >2 or P/E >50x on flat/declining growth" }
   },
   {
-    id: "S10", label: "Exponential Market", max: 3,
-    what: "The market this company operates in doesn't fully exist yet at scale — but will be 100x bigger in 10 years. Think green hydrogen, waste-to-energy, smart traffic management, EV charging, space tech, water treatment. Genuinely nascent, at the start of an S-curve.",
-    question: "Will this market be 100x bigger in 10 years? Is there a government programme?",
-    source: "NITI Aayog strategy documents, Budget speech, PM mission announcements, SECI programme announcements",
-    pass: "Green hydrogen company: SECI SIGHT programme, India's 5 MMT green H2 target by 2030",
-    fail: "Refrigerant blending — mature commodity cycle, not exponential",
-    note: "If S10 = 3, then S1 auto-scores 3. True inflection requires: govt programme + proven technology + early commercial revenues.",
-    scoring: { 3: "Govt programme + proven technology + early commercial revenues", 2: "Clear govt intent but still pre-commercial", 1: "Adjacent to an exponential market", 0: "Mature, commoditised market" }
+    id: "S10", label: "Exponential Market & Scale", max: 5, primary: true,
+    what: "The market this company operates in is at the start of an S-curve — revenues are early but the addressable market will be orders of magnitude larger in 10 years. Exponential sales growth (not just high growth — genuinely compounding acceleration quarter on quarter) is the clearest signal. Government programmes, budget allocations, and PM mission mandates are the ignition.",
+    question: "Is revenue growth accelerating QoQ (not just YoY)? Will this market be 100x bigger in 10 years? Is there a dedicated government programme with budget?",
+    source: "NITI Aayog strategy documents, Budget speech, PM mission announcements, SECI programme announcements, company quarterly revenue trend (check acceleration)",
+    pass: "Green hydrogen: SECI SIGHT programme + 5 MMT target. EV charging: FAME III. Smart metering: RDSS scheme ₹3.03L Cr",
+    fail: "Refrigerant blending — mature commodity cycle. IT services — linear, not exponential. Traditional textiles.",
+    note: "PRIMARY SIGNAL (max 5). If S10 ≥ 3, S1 auto-scores 3. If S10 = 5, S1 auto-scores 3 (its max). Look for QoQ revenue acceleration as the clearest proof of exponential traction — not management guidance.",
+    scoring: { 5: "QoQ revenue acceleration confirmed + India's #1 funded policy priority + proven tech + market 1000x in 15 yrs + early revenues growing >100% YoY", 4: "Revenue accelerating >50% YoY with clear inflection + govt programme + proven technology + 100x market potential", 3: "Govt programme + proven technology + early commercial revenues", 2: "Clear govt intent but still pre-commercial or nascent revenues", 1: "Adjacent to an exponential market, indirect benefit", 0: "Mature, commoditised or linearly growing market" }
   },
   {
     id: "S11", label: "Mass Life Impact", max: 3,
@@ -134,10 +135,12 @@ export const SIGNALS: Signal[] = [
   }
 ];
 
+// Max score = 42 (S3 + S4 + S10 are primary at max 5 each; rest unchanged at 27)
+// Band thresholds keep the same % cutoffs as the original 36-point scale
 export const BANDS = [
-  { min: 26, label: "STRONG BUY",  color: "#22c55e", bg: "#022c11", desc: "Research deeply, build position. Very rare — verify order book independently." },
-  { min: 18, label: "WATCHLIST",   color: "#f59e0b", bg: "#1c1005", desc: "Set a specific entry trigger. Wait for a catalytic event before buying." },
-  { min: 12, label: "INVESTIGATE", color: "#f97316", bg: "#1c0e05", desc: "Check blockers — can they resolve? Annual report + quarterly results needed." },
+  { min: 30, label: "STRONG BUY",  color: "#22c55e", bg: "#022c11", desc: "Research deeply, build position. Very rare — verify order book independently." },
+  { min: 21, label: "WATCHLIST",   color: "#f59e0b", bg: "#1c1005", desc: "Set a specific entry trigger. Wait for a catalytic event before buying." },
+  { min: 14, label: "INVESTIGATE", color: "#f97316", bg: "#1c0e05", desc: "Check blockers — can they resolve? Annual report + quarterly results needed." },
   { min: 0,  label: "AVOID",       color: "#ef4444", bg: "#1f0505", desc: "Do not invest. Eliminate from list entirely." },
 ] as const;
 

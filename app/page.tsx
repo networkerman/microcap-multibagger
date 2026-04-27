@@ -38,13 +38,13 @@ export default function Home() {
 
         {/* Score bands */}
         <div style={{ marginTop: 20, background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 18px" }}>
-          <div style={{ color: "#3d5a73", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>SCORING BANDS · MAX 36 POINTS</div>
+          <div style={{ color: "#3d5a73", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>SCORING BANDS · MAX 42 PTS · S3/S4/S10 PRIMARY (5pts each)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {[
-              { r: "≥ 26", l: "STRONG BUY", c: "#22c55e" },
-              { r: "18–25", l: "WATCHLIST", c: "#f59e0b" },
-              { r: "12–17", l: "INVESTIGATE", c: "#f97316" },
-              { r: "< 12", l: "AVOID", c: "#ef4444" },
+              { r: "≥ 30", l: "STRONG BUY", c: "#22c55e" },
+              { r: "21–29", l: "WATCHLIST", c: "#f59e0b" },
+              { r: "14–20", l: "INVESTIGATE", c: "#f97316" },
+              { r: "< 14", l: "AVOID", c: "#ef4444" },
             ].map(b => (
               <div key={b.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: b.c, flexShrink: 0 }} />
