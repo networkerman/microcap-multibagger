@@ -145,7 +145,7 @@ export const BANDS = [
 ] as const;
 
 export function getBand(score: number) {
-  return [...BANDS].reverse().find(b => score >= b.min) ?? BANDS[3];
+  return BANDS.find(b => score >= b.min) ?? BANDS[3];
 }
 
-export const MAX_SCORE = SIGNALS.reduce((a, s) => a + s.max, 0); // 36
+export const MAX_SCORE = SIGNALS.reduce((a, s) => a + s.max, 0); // 42
