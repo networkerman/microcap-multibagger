@@ -1,65 +1,64 @@
-import Image from "next/image";
+import StockSearch from "@/components/StockSearch";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main style={{ background: "#060f18", minHeight: "100vh", fontFamily: "'Inter','Segoe UI',sans-serif", padding: "60px 16px", color: "#e2e8f0" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <div style={{ display: "inline-block", background: "#f59e0b18", border: "1px solid #f59e0b44", borderRadius: 20, padding: "4px 16px", fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 2, marginBottom: 20 }}>
+            MICROCAP MULTIBAGGER · FRAMEWORK v2.0
+          </div>
+          <h1 style={{ margin: "0 0 12px", fontSize: 42, fontWeight: 900, color: "#ffd700", letterSpacing: -1.5, lineHeight: 1.1 }}>
+            12-Signal<br />Stock Analyser
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p style={{ margin: "0 auto", color: "#3d5a73", fontSize: 15, maxWidth: 440, lineHeight: 1.7 }}>
+            AI-powered analysis across 12 signals designed to find policy-driven, high-growth Indian microcaps before the market does.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Search */}
+        <StockSearch />
+
+        {/* How it works */}
+        <div style={{ marginTop: 48, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          {[
+            { n: "1", t: "Search", d: "Type any NSE or BSE listed company name or symbol" },
+            { n: "2", t: "AI Scores It", d: "Claude analyses 12 signals using public filings and data" },
+            { n: "3", t: "Get Report", d: "Report emailed to you — also public for all to see" },
+          ].map(step => (
+            <div key={step.n} style={{ background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 14px" }}>
+              <div style={{ color: "#f59e0b", fontWeight: 900, fontSize: 22, marginBottom: 6 }}>{step.n}</div>
+              <div style={{ color: "#c8d8e8", fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{step.t}</div>
+              <div style={{ color: "#3d5a73", fontSize: 12, lineHeight: 1.5 }}>{step.d}</div>
+            </div>
+          ))}
         </div>
-      </main>
-    </div>
+
+        {/* Score bands */}
+        <div style={{ marginTop: 20, background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 18px" }}>
+          <div style={{ color: "#3d5a73", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>SCORING BANDS · MAX 36 POINTS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {[
+              { r: "≥ 26", l: "STRONG BUY", c: "#22c55e" },
+              { r: "18–25", l: "WATCHLIST", c: "#f59e0b" },
+              { r: "12–17", l: "INVESTIGATE", c: "#f97316" },
+              { r: "< 12", l: "AVOID", c: "#ef4444" },
+            ].map(b => (
+              <div key={b.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: b.c, flexShrink: 0 }} />
+                <span style={{ color: b.c, fontWeight: 700, fontSize: 13, minWidth: 36 }}>{b.r}</span>
+                <span style={{ color: "#5a7a94", fontSize: 12 }}>{b.l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p style={{ textAlign: "center", color: "#1a2e40", fontSize: 11, marginTop: 32 }}>
+          Open source · Reports are public · Not financial advice
+        </p>
+      </div>
+    </main>
   );
 }
