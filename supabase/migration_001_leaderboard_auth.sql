@@ -27,17 +27,27 @@ CREATE INDEX IF NOT EXISTS watchlist_user_idx ON user_watchlist (user_id);
 -- Row-level security: users can only see/manage their own watchlist
 ALTER TABLE user_watchlist ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Users can view own watchlist"
+-- CREATE POLICY doesn't support IF NOT EXISTS — use DROP then CREATE for idempotency.
+DROP POLICY IF EXISTS "Users can view own watchlist"   ON user_watchlist;
+DROP POLICY IF EXISTS "Users can insert own watchlist" ON user_watchlist;
+DROP POLICY IF EXISTS "Users can delete own watchlist" ON user_watchlist;
+
+CREATE POLICY "Users can view own watchlist"
   ON user_watchlist FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can insert own watchlist"
+CREATE POLICY "Users can insert own watchlist"
   ON user_watchlist FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can delete own watchlist"
+CREATE POLICY "Users can delete own watchlist"
   ON user_watchlist FOR DELETE
   USING (auth.uid() = user_id);
+
+-- Grant table-level access to the authenticated role so RLS policies can fire.
+-- (The service role used by API routes bypasses RLS entirely, but this is
+--  required for any future direct-client queries from logged-in users.)
+GRANT SELECT, INSERT, DELETE ON public.user_watchlist TO authenticated;
 
 -- 3. Rate limiting log — append-only, queried by (ip, endpoint, created_at window)
 CREATE TABLE IF NOT EXISTS rate_limit_log (
