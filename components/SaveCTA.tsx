@@ -6,6 +6,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const STORAGE_KEY = "mmb_email";
+
 interface Props {
   position: "top" | "bottom";
 }
@@ -27,7 +29,9 @@ export default function SaveCTA({ position }: Props) {
   if (user !== null) return null;
 
   const goToLogin = () => {
-    router.push(`/auth/login?next=${encodeURIComponent(window.location.pathname)}`);
+    const storedEmail = localStorage.getItem(STORAGE_KEY) ?? "";
+    const url = `/auth/login?next=${encodeURIComponent(window.location.pathname)}${storedEmail ? `&email=${encodeURIComponent(storedEmail)}` : ""}`;
+    router.push(url);
   };
 
   const isTop = position === "top";
@@ -48,10 +52,10 @@ export default function SaveCTA({ position }: Props) {
     }}>
       <div>
         <div style={{ color: "#c8d8e8", fontWeight: 600, fontSize: 13, marginBottom: 3 }}>
-          ☆ Save this analysis to your watchlist
+          ☆ Get this analysis emailed to you
         </div>
         <div style={{ color: "#3d5a73", fontSize: 12 }}>
-          Log in to track your research over time and build your personal watchlist.
+          Sign in free to receive completed reports by email and build your personal watchlist.
         </div>
       </div>
       <button

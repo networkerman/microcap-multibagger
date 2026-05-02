@@ -8,8 +8,9 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const next = searchParams.get("next") ?? "/";
+  const prefillEmail = searchParams.get("email") ?? "";
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,8 +61,11 @@ function LoginForm() {
         </div>
         <div style={{ color: "#e2e8f0", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Sign in to save your research</div>
         <div style={{ color: "#5a7a94", fontSize: 14, lineHeight: 1.6 }}>
-          We'll email you a magic link — no password required.<br />
-          {next !== "/" && <span style={{ color: "#3d5a73" }}>You'll be taken back to your analysis after signing in.</span>}
+          {prefillEmail
+            ? <>Get this analysis emailed to <strong style={{ color: "#c8d8e8" }}>{prefillEmail}</strong> and save it to your watchlist.<br /></>
+            : <>We'll email you your completed analyses and let you build a personal watchlist.<br /></>
+          }
+          <span style={{ color: "#3d5a73" }}>Magic link sign-in — no password required.</span>
         </div>
       </div>
 
