@@ -230,8 +230,8 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
         </div>
       </div>
 
-      {/* AI Summary — only when complete */}
-      {report.summary && (
+      {/* AI Summary — only when complete and is plain text (guard against stale JSON data) */}
+      {report.summary && !report.summary.trimStart().startsWith("{") && (
         <div style={{ background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
           <div style={{ color: "#38bdf8", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8 }}>AI INVESTMENT THESIS</div>
           <p style={{ color: "#7a9ab5", fontSize: 14, lineHeight: 1.75, margin: 0 }}>{report.summary}</p>

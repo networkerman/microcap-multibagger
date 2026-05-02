@@ -31,6 +31,7 @@ function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
+// Used for signal scoring — strict JSON output required
 const SYSTEM = `You are an expert Indian stock market analyst specialising in microcap and smallcap stocks on NSE and BSE.
 You apply the Microcap Multibagger Framework — a signal-based scoring system to find policy-driven, high-growth smallcaps.
 
@@ -42,6 +43,11 @@ RULES:
 3. Never fabricate data. If unverifiable, say so and score accordingly.
 4. Cite a specific source for every signal score.
 5. Return ONLY valid JSON — no markdown, no preamble, no trailing text.`;
+
+// Used for the plain-text summary — no JSON requirement
+const SUMMARY_SYSTEM = `You are an expert Indian stock market analyst specialising in microcap and smallcap stocks on NSE and BSE.
+You apply the Microcap Multibagger Framework — a signal-based scoring system to find policy-driven, high-growth smallcaps.
+Write clearly and concisely in plain prose. Do not use JSON, markdown, bullet points, or headers.`;
 
 // Scores a subset of signals for one company. Called in parallel for each group.
 // dataContext is pre-fetched financial data from Screener.in — when provided,
@@ -122,7 +128,7 @@ Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks
   const message = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 400,
-    system: SYSTEM,
+    system: SUMMARY_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
 
