@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 
 export interface Instrument {
   instrument_token: number;
@@ -38,7 +39,7 @@ export async function fetchEquityInstruments(): Promise<StockInstrument[]> {
       .filter(row => row.instrument_type === "EQ")
       .map(row => ({
         symbol: row.tradingsymbol.trim(),
-        name: row.name.trim(),
+        name: decodeHtmlEntities(row.name.trim()),
         exchange,
         instrument_token: Number(row.instrument_token),
         exchange_token: Number(row.exchange_token),

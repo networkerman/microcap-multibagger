@@ -3,6 +3,8 @@
 // actual numbers, not training-data guesses (which are unreliable for
 // SME-listed, recently-IPO'd, or low-profile stocks).
 
+import { decodeHtmlEntities } from "@/lib/html-entities";
+
 export interface ScreenerData {
   companyName: string;
   screenerUrl: string;
@@ -41,7 +43,9 @@ const HEADERS = {
 };
 
 function clean(s: string): string {
-  return s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  // Strip tags first, then decode entities, then collapse whitespace.
+  // Order matters: decoding before stripping could expose injected tags.
+  return decodeHtmlEntities(s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim());
 }
 
 // Resolves a stock symbol to its Screener.in company page URL.
