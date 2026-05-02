@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { SIGNALS, getBand, MAX_SCORE } from "@/lib/signals";
+import SaveButton from "@/components/SaveButton";
+import SaveCTA from "@/components/SaveCTA";
 
 interface SignalResult {
   signal_id: string;
@@ -147,6 +149,11 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
             </button>
           )}
 
+          {/* Save to watchlist — compact pill in action bar */}
+          {!isAnalyzing && (
+            <SaveButton symbol={report.symbol} exchange={report.exchange} compact />
+          )}
+
           {/* Refresh button */}
           {onRequestRefresh && !isAnalyzing && (
             <button
@@ -163,6 +170,9 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
           )}
         </div>
       </div>
+
+      {/* Save CTA — top (anonymous users only, hidden once logged in) */}
+      {!isAnalyzing && <SaveCTA position="top" />}
 
       {/* Score banner */}
       <div style={{ background: bg, border: `1px solid ${color}55`, borderRadius: 16, padding: "20px 24px", marginBottom: 22, transition: "background 0.6s ease, border-color 0.6s ease" }}>
@@ -371,7 +381,10 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
         })}
       </div>
 
-      <div style={{ textAlign: "center", color: "#1a2e40", fontSize: 11, borderTop: "1px solid #0a1824", paddingTop: 14, marginTop: 16 }}>
+      {/* Save CTA — bottom (anonymous users only) */}
+      {!isAnalyzing && <SaveCTA position="bottom" />}
+
+      <div style={{ textAlign: "center", color: "#1a2e40", fontSize: 11, borderTop: "1px solid #0a1824", paddingTop: 14, marginTop: 20 }}>
         Framework v2.0 · Microcap Multibagger · Personal investment research only · Not financial advice
       </div>
     </div>

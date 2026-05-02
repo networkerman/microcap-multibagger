@@ -1,13 +1,33 @@
 import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { createAuthClient } from "@/lib/supabase/server-auth";
 import { analyzeSignalGroup, generateSummary, SIGNAL_GROUPS, type SignalResult } from "@/lib/claude";
 import { getBand, MAX_SCORE } from "@/lib/signals";
 import { sendReportReadyEmail } from "@/lib/resend";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 
-// Extend Vercel serverless timeout to 60s (max on Hobby plan).
-// The route returns 202 immediately; actual analysis runs in after() background task.
 export const maxDuration = 60;
+
+// Rate limit: N analyses per IP per hour. Override via RATE_LIMIT_HOURLY env var.
+const RATE_LIMIT = parseInt(process.env.RATE_LIMIT_HOURLY ?? "5");
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+async function checkRateLimit(ip: string, supabase: ReturnType<typeof createServiceClient>): Promise<boolean> {
+  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+
+  const { count } = await supabase
+    .from("rate_limit_log")
+    .select("*", { count: "exact", head: true })
+    .eq("ip", ip)
+    .eq("endpoint", "analyze")
+    .gte("created_at", windowStart);
+
+  if ((count ?? 0) >= RATE_LIMIT) return false;
+
+  // Log this request (fire and forget — don't block the response)
+  supabase.from("rate_limit_log").insert({ ip, endpoint: "analyze" }).then(() => {});
+  return true;
+}
 
 async function persistSignals(supabase: ReturnType<typeof createServiceClient>, reportId: string, signals: SignalResult[]) {
   if (signals.length === 0) return;
@@ -31,7 +51,6 @@ async function runAnalysis(
   exchange: string,
   companyName: string,
 ) {
-  // Fetch real financial data to ground Claude with verified numbers
   const screenerData = await fetchScreenerData(symbol, exchange);
   const dataContext = screenerData ? formatScreenerContext(screenerData) : "";
 
@@ -41,8 +60,6 @@ async function runAnalysis(
       .eq("id", reportId);
   }
 
-  // Fire all 3 signal groups simultaneously; each saves to DB as it completes
-  // so the polling client sees progressive results
   const allSignals: SignalResult[] = [];
 
   try {
@@ -77,7 +94,7 @@ async function runAnalysis(
   }).eq("id", reportId);
 
   // Notify subscribers
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://invest-growth.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://microcap-multibagger.vercel.app";
   const reportUrl = `${appUrl}/stock/${exchange}:${symbol}`;
   const { data: pendingNotifs } = await supabase
     .from("notification_requests")
@@ -104,14 +121,46 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "symbol, exchange, companyName required" }, { status: 400 });
   }
 
+  // --- Rate limiting ---
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const supabase = createServiceClient();
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  const allowed = await checkRateLimit(ip, supabase);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: `Rate limit reached. Max ${RATE_LIMIT} analyses per hour per IP.` },
+      { status: 429 }
+    );
+  }
 
-  // Upsert report row as "analyzing"
+  // --- Session cookie (anonymous tracking) ---
+  const sessionId = req.headers.get("cookie")
+    ?.split(";")
+    .find(c => c.trim().startsWith("mmb_session="))
+    ?.split("=")[1]?.trim()
+    ?? crypto.randomUUID();
+
+  // --- Logged-in user (optional) ---
+  let triggeredBy: string | null = null;
+  try {
+    const authClient = await createAuthClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    triggeredBy = user?.id ?? null;
+  } catch { /* non-fatal — analysis is always public */ }
+
+  // --- Upsert report ---
+  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
   const { data: report, error: upsertErr } = await supabase
     .from("reports")
     .upsert(
-      { symbol, exchange, company_name: companyName, status: "analyzing", expires_at: expiresAt },
+      {
+        symbol,
+        exchange,
+        company_name: companyName,
+        status: "analyzing",
+        expires_at: expiresAt,
+        session_id: sessionId,
+        triggered_by: triggeredBy,
+      },
       { onConflict: "symbol,exchange" }
     )
     .select()
@@ -121,16 +170,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: upsertErr?.message ?? "upsert failed" }, { status: 500 });
   }
 
-  // Clear old signal rows
   await supabase.from("report_signals").delete().eq("report_id", report.id);
 
-  // Store email before returning (so we can notify even if something goes wrong)
   if (email) {
     await supabase.from("notification_requests").insert({ report_id: report.id, email });
   }
 
-  // Return 202 immediately so the UI can start polling and showing the skeleton
+  // Return 202 immediately; analysis runs in the background
   after(() => runAnalysis(supabase, report.id, symbol, exchange, companyName));
 
-  return NextResponse.json({ ok: true, report_id: report.id }, { status: 202 });
+  const response = NextResponse.json({ ok: true, report_id: report.id }, { status: 202 });
+
+  // Set / refresh the anonymous session cookie (1 year, httpOnly)
+  response.cookies.set("mmb_session", sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+  });
+
+  return response;
 }

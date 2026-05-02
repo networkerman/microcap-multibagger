@@ -1,4 +1,5 @@
 import StockSearch from "@/components/StockSearch";
+import Leaderboard from "@/components/Leaderboard";
 
 export default function Home() {
   return (
@@ -21,8 +22,11 @@ export default function Home() {
         {/* Search */}
         <StockSearch />
 
+        {/* Leaderboard — server-rendered, shows top 3 from last 30 days */}
+        <Leaderboard />
+
         {/* How it works */}
-        <div style={{ marginTop: 48, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div style={{ marginTop: 40, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           {[
             { n: "1", t: "Search", d: "Type any NSE or BSE listed company name or symbol" },
             { n: "2", t: "AI Scores It", d: "Claude analyses 12 signals using public filings and data" },
