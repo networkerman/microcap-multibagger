@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SIGNALS, getBand, MAX_SCORE } from "@/lib/signals";
 import SaveButton from "@/components/SaveButton";
 import SaveCTA from "@/components/SaveCTA";
+import DeepAnalysis from "@/components/DeepAnalysis";
 
 interface SignalResult {
   signal_id: string;
@@ -383,6 +384,67 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
 
       {/* Save CTA — bottom (anonymous users only) */}
       {!isAnalyzing && <SaveCTA position="bottom" />}
+
+      {/* 15-Question Deep Analysis — STRONG BUY and WATCHLIST only */}
+      {!isAnalyzing && (band === "STRONG BUY" || band === "WATCHLIST") && (
+        <DeepAnalysis
+          reportId={report.id}
+          symbol={report.symbol}
+          exchange={report.exchange}
+          companyName={report.company_name}
+          band={band}
+        />
+      )}
+
+      {/* Buy Me a Coffee */}
+      {!isAnalyzing && (
+        <div style={{
+          marginTop: 36,
+          background: "#0c1d2c",
+          border: "1px solid #1a2e40",
+          borderRadius: 16,
+          padding: "24px 24px 20px",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ color: "#f59e0b", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
+                SUPPORT THIS WORK
+              </div>
+              <p style={{ color: "#7a9ab5", fontSize: 13, lineHeight: 1.7, margin: "0 0 8px" }}>
+                Every stock report on this platform is a <strong style={{ color: "#c8d8e8" }}>live AI research run</strong> — not
+                a cached result. Each 12-signal analysis uses Claude Sonnet, and each 15-question deep analysis uses
+                DeepSeek Reasoner. Together they consume <strong style={{ color: "#c8d8e8" }}>₹70–80 in API tokens per stock</strong>.
+              </p>
+              <p style={{ color: "#5a7a94", fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                If this tool has helped your research, consider buying me a coffee. It keeps the servers running,
+                the APIs paid, and the framework improving.
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, paddingTop: 4 }}>
+              <a
+                href="https://rzp.io/rzp/vbTHarl"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-block",
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  color: "#000",
+                  borderRadius: 12,
+                  padding: "12px 28px",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  textDecoration: "none",
+                  letterSpacing: 0.5,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ☕ Buy Me a Coffee · ₹299
+              </a>
+              <span style={{ color: "#2e4a60", fontSize: 10 }}>Razorpay · UPI / Cards / Net Banking</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ textAlign: "center", color: "#1a2e40", fontSize: 11, borderTop: "1px solid #0a1824", paddingTop: 14, marginTop: 20 }}>
         Framework v2.0 · Microcap Multibagger · Personal investment research only · Not financial advice
