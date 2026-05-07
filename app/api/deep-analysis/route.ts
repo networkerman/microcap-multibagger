@@ -28,46 +28,36 @@ export async function GET(req: Request) {
   return NextResponse.json(data ?? null);
 }
 
-// POST — trigger deep analysis (requires verified payment)
+// POST — trigger deep analysis (free, no payment required)
 export async function POST(req: Request) {
-  const { report_id, symbol, exchange, company_name, payment_id } = await req.json() as {
+  const { report_id, symbol, exchange, company_name } = await req.json() as {
     report_id: string;
     symbol: string;
     exchange: string;
     company_name: string;
-    payment_id: string;
   };
 
-  if (!report_id || !symbol || !exchange || !payment_id) {
-    return NextResponse.json({ error: "report_id, symbol, exchange, payment_id required" }, { status: 400 });
+  if (!report_id || !symbol || !exchange) {
+    return NextResponse.json({ error: "report_id, symbol, exchange required" }, { status: 400 });
   }
 
   const supabase = createServiceClient();
 
-  // Verify the payment exists and is in 'paid' status
-  const { data: payment } = await supabase
-    .from("payments")
-    .select("id, status")
-    .eq("razorpay_payment_id", payment_id)
-    .single();
-
-  if (!payment || payment.status !== "paid") {
-    return NextResponse.json({ error: "Payment not verified" }, { status: 402 });
-  }
-
-  // Check if analysis already exists for this payment
+  // Return cached result if one already exists
   const { data: existing } = await supabase
     .from("deep_analyses")
-    .select("id")
-    .eq("payment_id", payment_id)
+    .select("id, questions")
+    .eq("symbol", symbol)
+    .eq("exchange", exchange)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .single();
 
-  if (existing) {
-    // Already ran — return the id so client can fetch it
+  if (existing && (existing.questions as any[])?.length > 0) {
     return NextResponse.json({ ok: true, analysis_id: existing.id, cached: true });
   }
 
-  // Insert a placeholder row so client can poll
+  // Insert placeholder row so client can poll
   const { data: placeholder } = await supabase
     .from("deep_analyses")
     .insert({
@@ -77,7 +67,6 @@ export async function POST(req: Request) {
       company_name,
       questions: [],
       overall_verdict: null,
-      payment_id,
     })
     .select("id")
     .single();
@@ -88,12 +77,11 @@ export async function POST(req: Request) {
 
   const analysisId = placeholder.id;
 
-  // Run analysis in background — DeepSeek reasoner takes ~30-90s
+  // Run DeepSeek analysis in background (~60-120s)
   after(async () => {
     try {
       const screenerData = await fetchScreenerData(symbol, exchange);
       const context = screenerData ? formatScreenerContext(screenerData) : "";
-
       const result = await runDeepAnalysis(symbol, exchange, company_name, context);
 
       await supabase.from("deep_analyses").update({
@@ -102,7 +90,6 @@ export async function POST(req: Request) {
       }).eq("id", analysisId);
     } catch (err) {
       console.error("Deep analysis failed:", err);
-      // Leave the placeholder row — client will see empty questions and can retry
     }
   });
 
