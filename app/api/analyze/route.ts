@@ -61,13 +61,15 @@ async function runAnalysis(
   }
 
   const allSignals: SignalResult[] = [];
+  let businessModel: string | null = null;
 
   try {
     await Promise.all(
       SIGNAL_GROUPS.map(group =>
         analyzeSignalGroup(symbol, exchange, companyName, group, dataContext)
-          .then(async (signals) => {
+          .then(async ({ signals, businessModel: bm }) => {
             allSignals.push(...signals);
+            if (bm && !businessModel) businessModel = bm;
             await persistSignals(supabase, reportId, signals);
           })
       )
@@ -90,6 +92,7 @@ async function runAnalysis(
     max_score: MAX_SCORE,
     band: band.label,
     summary,
+    business_model: businessModel,
     analyzed_at: new Date().toISOString(),
   }).eq("id", reportId);
 

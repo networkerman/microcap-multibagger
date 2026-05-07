@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { getBand } from "./signals";
+import { MAX_SCORE } from "./signals";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY!);
@@ -33,7 +33,7 @@ export async function sendReportReadyEmail({
   await getResend().emails.send({
     from: process.env.FROM_EMAIL!,
     to,
-    subject: `${companyName} (${symbol}) · ${band} · ${totalScore}/36 — Microcap Multibagger Report`,
+    subject: `${companyName} (${symbol}) · ${band} · ${totalScore}/${MAX_SCORE} — Microcap Multibagger Report`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -49,7 +49,7 @@ export async function sendReportReadyEmail({
 
   <div style="background:#0c1d2c;border:2px solid ${color};border-radius:16px;padding:24px;text-align:center;margin-bottom:24px;">
     <div style="font-size:64px;font-weight:900;color:${color};line-height:1;">${totalScore}</div>
-    <div style="color:#5a7a94;font-size:16px;margin-bottom:12px;">out of 36</div>
+    <div style="color:#5a7a94;font-size:16px;margin-bottom:12px;">out of ${MAX_SCORE}</div>
     <div style="display:inline-block;background:${color}22;border:2px solid ${color};border-radius:10px;padding:10px 24px;">
       <span style="color:${color};font-weight:900;font-size:18px;letter-spacing:2px;">${band}</span>
     </div>

@@ -7,10 +7,10 @@ Built on the **12-Signal Framework** — a scoring system designed to find polic
 **Live scoring bands:**
 | Score | Rating |
 |---|---|
-| ≥ 26 / 36 | STRONG BUY |
-| 18–25 | WATCHLIST |
-| 12–17 | INVESTIGATE |
-| < 12 | AVOID |
+| ≥ 28 / 39 | STRONG BUY |
+| 20–27 | WATCHLIST |
+| 13–19 | INVESTIGATE |
+| < 13 | AVOID |
 
 ---
 
@@ -31,17 +31,17 @@ Built on the **12-Signal Framework** — a scoring system designed to find polic
 |---|---|---|
 | S1 | Sector Tailwind | 3 |
 | S2 | Order Book > 2x Mcap | 3 |
-| S3 | Product / Service Quality | 3 |
-| S4 | Strong Financials | 3 |
+| S3 | MOAT & Entry Barriers | 5 |
+| S4 | OPM & Financial Strength | 5 |
 | S5 | Promoter Quality & Connections | 3 |
 | S6 | Credit Rating | 2 |
 | S7 | Employee Satisfaction | 2 |
 | S8 | Long-term Expansion Plan | 2 |
 | S9 | Undervalued vs Growth (PEG) | 3 |
-| S10 | Exponential Market | 3 |
+| S10 | Exponential Market & Scale | 5 |
 | S11 | Mass Life Impact | 3 |
 | S12 | Revenue Quality / Predictability | 3 |
-| | **Total** | **36** |
+| | **Total** | **39** |
 
 ---
 
