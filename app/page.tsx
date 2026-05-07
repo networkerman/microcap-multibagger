@@ -42,13 +42,13 @@ export default function Home() {
 
         {/* Score bands */}
         <div style={{ marginTop: 20, background: "#0c1d2c", border: "1px solid #1a2e40", borderRadius: 12, padding: "16px 18px" }}>
-          <div style={{ color: "#3d5a73", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>SCORING BANDS · MAX 39 PTS · S3/S4/S10 PRIMARY (5pts each)</div>
+          <div style={{ color: "#3d5a73", fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>SCORING BANDS · MAX 41 PTS · S3/S4/S9/S10 PRIMARY (5pts each)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {[
-              { r: "≥ 28", l: "STRONG BUY", c: "#22c55e" },
-              { r: "20–27", l: "WATCHLIST", c: "#f59e0b" },
-              { r: "13–19", l: "INVESTIGATE", c: "#f97316" },
-              { r: "< 13", l: "AVOID", c: "#ef4444" },
+              { r: "≥ 29", l: "STRONG BUY", c: "#22c55e" },
+              { r: "21–28", l: "WATCHLIST", c: "#f59e0b" },
+              { r: "14–20", l: "INVESTIGATE", c: "#f97316" },
+              { r: "< 14", l: "AVOID", c: "#ef4444" },
             ].map(b => (
               <div key={b.l} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: b.c, flexShrink: 0 }} />

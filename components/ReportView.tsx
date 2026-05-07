@@ -218,10 +218,10 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
         {/* Band chips */}
         <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
           {[
-            { r: "≥28", l: "STRONG BUY",  c: "#22c55e", a: liveScore >= 28 },
-            { r: "20–27", l: "WATCHLIST",  c: "#f59e0b", a: liveScore >= 20 && liveScore < 28 },
-            { r: "13–19", l: "INVESTIGATE",c: "#f97316", a: liveScore >= 13 && liveScore < 20 },
-            { r: "<13",   l: "AVOID",      c: "#ef4444", a: liveScore < 13 },
+            { r: "≥29", l: "STRONG BUY",  c: "#22c55e", a: liveScore >= 29 },
+            { r: "21–28", l: "WATCHLIST",  c: "#f59e0b", a: liveScore >= 21 && liveScore < 29 },
+            { r: "14–20", l: "INVESTIGATE",c: "#f97316", a: liveScore >= 14 && liveScore < 21 },
+            { r: "<14",   l: "AVOID",      c: "#ef4444", a: liveScore < 14 },
           ].map(b => (
             <div key={b.l} style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.a ? b.c + "28" : "#0c1d2c", color: b.a ? b.c : "#2e4a60", border: `1px solid ${b.a ? b.c : "#1a2e40"}`, transition: "all 0.5s ease" }}>
               {b.r} · {b.l}

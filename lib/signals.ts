@@ -361,34 +361,35 @@ export const SIGNALS: Signal[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   {
     id: "S7", label: "Employee Satisfaction", max: 2,
-    what: "Great Place to Work certification, Glassdoor reviews >3.5, ISO 45001 occupational safety certification, low attrition signals. People quality = execution quality.",
-    question: "GPTW certified? ISO 45001? Glassdoor >3.5?",
-    source: "Great Place to Work India website, Glassdoor company page, LinkedIn employee reviews",
-    pass: "Company with ISO 45001 + multiple Glassdoor reviews averaging 4.0+",
-    fail: "High attrition in key technical/creative roles, anonymous management complaints",
-    note: "ISO 45001 + Glassdoor >3.5 is an acceptable substitute for companies without a formal GPTW certification. For companies with <50 employees, Glassdoor may not have enough reviews — LinkedIn employee sentiment and retention data becomes the primary source.",
+    what: "For microcaps and smallcaps, formal certifications (GPTW, ISO 45001) are rare and not expected. The PRIMARY evidence is LinkedIn headcount growth trend, AmbitionBox/Glassdoor review sentiment, and employee retention of key technical/managerial staff. People quality = execution quality — but measured appropriately for company size.",
+    question: "Is the team growing? Are current employees staying 3+ years? Are online reviews broadly positive (>3.0 on AmbitionBox/Glassdoor)? Any labour disputes?",
+    source: "LinkedIn company page (headcount trend, employee tenure), AmbitionBox (Indian SME reviews), Glassdoor, Great Place to Work India, EPFO compliance records, annual report employee cost section",
+    pass: "Manufacturing SME: LinkedIn headcount grew 30% YoY, AmbitionBox 3.8★, key engineers staying 5+ years, no PF defaults",
+    fail: "High attrition in technical roles, management complaints on AmbitionBox, EPFO default notice, or labour dispute history",
+    note: "GPTW certification is a BONUS, not the primary path. For microcaps (<₹2,000 Cr mcap), LinkedIn headcount growth >20% YoY + AmbitionBox >3.0 is sufficient for score 2. The default score for 'no data found' is 1 — do NOT score 0 because you couldn't find Glassdoor reviews.",
     scoring: {
-      2: "GPTW certified OR ISO 45001 + Glassdoor >3.5",
-      1: "Glassdoor 3.0–3.5, no major red flags",
-      0: "Glassdoor <3.0 or visible high-attrition complaints"
+      2: "GPTW certified (bonus) OR LinkedIn headcount growing >20% YoY + AmbitionBox/Glassdoor >3.5 OR (for microcaps) LinkedIn growing >20% + AmbitionBox >3.0 with no red flags. Active hiring + positive employee sentiment.",
+      1: "LinkedIn headcount stable or growing slowly + AmbitionBox/Glassdoor 3.0–3.5 range. No negative signals. OR data is limited but no red flags found. DEFAULT score when employer data is sparse.",
+      0: "High-attrition complaints on AmbitionBox/Glassdoor, labour disputes, EPFO/PF default notices, or mass layoffs reported in news. Negative employee sentiment with specific evidence."
     },
     applicability: {
       mandatory: ["services","product"],
       optional: ["epc","manufacturing","financial","infrastructure","trading"],
       notApplicable: [],
       analogues: {
-        epc: "Focus on site worker safety (ISO 45001) and skilled labour retention. Glassdoor less relevant for contract labour — check labour ministry compliance instead.",
-        financial: "Focus on employee attrition rate (disclosed in annual report), Glassdoor reviews, and workplace awards.",
+        epc: "Focus on site worker safety compliance and skilled labour retention. Check for any labour ministry disputes. LinkedIn hiring for project engineers is a strong positive.",
+        financial: "Check annual report for employee attrition rate disclosure. LinkedIn headcount growth in branch/field roles signals expansion.",
       },
     },
     verificationSteps: [
-      { step: 1, action: "Search '[company name] Great Place to Work' on Google and the GPTW India certified companies directory", source: "greatplacetowork.in, Google", evidenceRequired: "GPTW certification status" },
-      { step: 2, action: "Check Glassdoor for the company — note overall rating, number of reviews, and any patterns in recent reviews (last 12 months)", source: "glassdoor.co.in", evidenceRequired: "Glassdoor rating, review count, key themes" },
-      { step: 3, action: "Check for ISO 45001 (occupational health & safety) certification on the company's website or in the annual report", source: "Company website, annual report", evidenceRequired: "ISO 45001 certification status" },
-      { step: 4, action: "Check LinkedIn company page for employee count trend (growing = positive) and any employee posts about company culture", source: "LinkedIn company page", evidenceRequired: "Employee count, culture signals" },
-      { step: 5, action: "For companies with <50 employees or no Glassdoor presence: LinkedIn employee sentiment and retention become the primary data. Score 1 if unable to verify.", source: "LinkedIn", evidenceRequired: "Available employee sentiment data" },
+      { step: 1, action: "Check LinkedIn company page: note total employee count AND year-over-year headcount growth %. Is the company actively hiring? Growing headcount = business confidence", source: "LinkedIn company page → Employees tab", evidenceRequired: "Employee count, YoY growth %, hiring trends" },
+      { step: 2, action: "Check AmbitionBox for the company — this has more Indian SME reviews than Glassdoor. Note rating, review count, and key themes (especially in last 12 months)", source: "ambitionbox.com", evidenceRequired: "AmbitionBox rating, review count, sentiment themes" },
+      { step: 3, action: "Check Glassdoor as secondary source — rating, review count, and any patterns in recent reviews", source: "glassdoor.co.in", evidenceRequired: "Glassdoor rating, review count, key themes" },
+      { step: 4, action: "Search for GPTW certification as a BONUS (not required). GPTW + strong LinkedIn = automatic score 2", source: "greatplacetowork.in, Google", evidenceRequired: "GPTW certification status (bonus only)" },
+      { step: 5, action: "NEGATIVE SCREEN: Search '[company name] labour dispute' AND '[company name] EPFO default' AND '[company name] layoffs'. Any negative findings cap the score at 0 regardless of other evidence", source: "Google News, EPFO website, labour ministry records", evidenceRequired: "Presence or absence of negative labour events" },
+      { step: 6, action: "Check LinkedIn for employee tenure — look at key technical/managerial staff. Are people staying 3+ years? This is the best retention signal for microcaps", source: "LinkedIn company page → People section", evidenceRequired: "Employee tenure patterns, especially in technical roles" },
     ],
-    notApplicableCondition: "ONLY if the company has <10 employees AND no online employer presence at all. In that case, score 1 (neutral), not 0.",
+    notApplicableCondition: "ONLY if the company has <10 employees AND no LinkedIn page AND no online reviews at all. In that case, score 1 (neutral). Never score 0 because of missing data.",
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -423,39 +424,42 @@ export const SIGNALS: Signal[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // S9 — UNDERVALUED VS GROWTH / PEG (max 3)
+  // S9 — VALUATION & MICROCAP ADVANTAGE (max 5)
   // ═══════════════════════════════════════════════════════════════════════════
   {
-    id: "S9", label: "Undervalued vs Growth (PEG)", max: 3,
-    what: "Low P/E relative to earnings growth rate. PEG = P/E ÷ EPS growth rate. PEG <1 = undervalued vs growth, PEG <0.5 = very attractive. Always cross-check with forward P/E, not just trailing.",
-    question: "Is P/E <30x? Is PEG <1.5? Is forward P/E lower than trailing?",
-    source: "Screener.in, Tickertape — check forward P/E vs analyst estimates, not trailing",
-    pass: "Univastu India: P/E ~15x on accelerating earnings. PPSL: P/E 6.1x vs sector 86x.",
-    fail: "P/E 126x on flat/declining growth. P/E 414x on ₹19 Cr revenue.",
-    note: "P/E <30x acceptable if growth >50%. PEG is the primary metric — not standalone P/E. For financial companies: use P/BV and ROE relationship (P/BV < ROE% = undervalued). For loss-making companies: use P/S vs revenue growth rate.",
+    id: "S9", label: "Valuation & Microcap Adv.", max: 5,
+    what: "This is a MULTIBAGGER framework — the highest returns come from companies small enough to 10x. Market cap is the PRIMARY lens: companies under ₹2,000 Cr get a structural advantage; companies over ₹10,000 Cr are mathematically near-impossible multibaggers regardless of PEG. PEG = P/E ÷ EPS growth rate is the secondary lens within each market cap tier.",
+    question: "Market cap under ₹2,000 Cr? PEG <1.5? Is this a microcap with room to multiply?",
+    source: "Screener.in (market cap ₹ Cr, Stock P/E, EPS growth rate), Tickertape, BSE shareholding for market cap cross-verification",
+    pass: "Univastu India: ₹246 Cr mcap, P/E 15x, EPS growing 30% → PEG 0.5 + microcap advantage. PPSL: ₹80 Cr mcap, P/E 6.1x vs sector 86x.",
+    fail: "HDFC Bank: ₹10L Cr+ mcap — cannot 10x. P/E 126x on ₹19 Cr revenue with declining growth. Megacap with PEG 0.5 is still NOT a multibagger.",
+    note: "MICROCAP MULTIBAGGER SIGNAL (max 5). Market cap tier matters MORE than PEG. A ₹100 Cr company with PEG 2.0 has more multibagger potential than a ₹1L Cr company with PEG 0.3. PEG <1.0 auto-scores 3 minimum IF market cap <₹5,000 Cr. For financial companies: use P/BV vs ROE. For loss-making: use P/S vs revenue growth. Companies over ₹10,000 Cr mcap can NEVER score above 2.",
     scoring: {
-      3: "PEG <1.0, P/E <20x on strong growth",
-      2: "PEG 1.0–1.5, P/E <30x",
-      1: "PEG 1.5–2.0 or P/E 30–50x",
-      0: "PEG >2 or P/E >50x on flat/declining growth"
+      5: "Mcap <₹500 Cr + PEG <1.0 + strong revenue growth >30%. True microcap with both valuation AND growth — maximum multibagger potential.",
+      4: "Mcap ₹500–2,000 Cr + PEG <1.0 + strong growth, or mcap <₹500 Cr + PEG 1.0–1.5. Smallcap with clear growth-value mismatch.",
+      3: "Mcap <₹5,000 Cr + PEG <1.0, or mcap <₹2,000 Cr + PEG 1.0–1.5. Reasonable valuation with growth AND small enough to multiply.",
+      2: "Mcap ₹5,000–10,000 Cr + PEG <1.5, or mcap <₹2,000 Cr + PEG 1.5–2.0. Midcap with decent valuation, or microcap with stretched but growing-into-it valuation.",
+      1: "Mcap >₹10,000 Cr regardless of PEG (too large to multibag), or mcap ₹5,000–10,000 Cr + PEG >1.5. Large caps and expensive midcaps.",
+      0: "Mcap >₹10,000 Cr + PEG >2.0, or any market cap with P/E >50x AND declining/flat growth. Expensive megacap — no multibagger potential."
     },
     applicability: {
       mandatory: ["epc","manufacturing","financial","infrastructure","services","trading","product"],
       optional: [],
       notApplicable: [],
       analogues: {
-        financial: "Use P/BV (Price to Book Value) vs ROE: if ROE > P/BV, the stock is undervalued. PEG can still be computed if earnings are positive.",
+        financial: "Use P/BV (Price to Book Value) + ROE. ROE > P/BV ratio = undervalued. Market cap tier rules apply identically.",
       },
     },
     verificationSteps: [
-      { step: 1, action: "Pull current P/E ratio from Screener.in. Note whether this is trailing or forward P/E", source: "Screener.in → Key Ratios → Stock P/E", evidenceRequired: "Current P/E value" },
-      { step: 2, action: "Calculate EPS growth rate: pull EPS for last 3 years from Screener.in annual P&L, compute CAGR. For forward PEG, use QoQ EPS trend to estimate next 12 months", source: "Screener.in → Profit & Loss → EPS row (annual)", evidenceRequired: "EPS for each of last 3 years, computed CAGR" },
-      { step: 3, action: "Calculate PEG = P/E ÷ EPS growth rate %. Example: P/E 15x, EPS growth 30% → PEG = 0.5", source: "Computed from steps 1 and 2", evidenceRequired: "PEG ratio" },
-      { step: 4, action: "Compare P/E with sector/industry average P/E. A company at 20x P/E in a sector averaging 50x is relatively undervalued", source: "Screener.in, Tickertape sector comparisons", evidenceRequired: "Company P/E vs sector average P/E" },
-      { step: 5, action: "For financials: pull P/BV and ROE. If ROE > P/BV ratio, the stock is undervalued. Compute P/BV ÷ ROE — <1 is undervalued.", source: "Screener.in → Key Ratios", evidenceRequired: "P/BV, ROE%, P/BV-to-ROE ratio" },
-      { step: 6, action: "For loss-making companies (negative P/E): use P/S ratio vs revenue growth rate. P/S < revenue growth % = undervalued.", source: "Screener.in", evidenceRequired: "P/S ratio, revenue growth %" },
+      { step: 1, action: "Pull MARKET CAP in ₹ Cr from Screener.in. This is the MOST IMPORTANT metric for this signal. Classify into tier: <₹500 Cr / ₹500–2,000 Cr / ₹2,000–5,000 Cr / ₹5,000–10,000 Cr / >₹10,000 Cr", source: "Screener.in → Key Ratios → Market Cap", evidenceRequired: "Market cap in ₹ Cr, assigned tier" },
+      { step: 2, action: "Pull current P/E ratio from Screener.in. Note whether trailing or forward", source: "Screener.in → Key Ratios → Stock P/E", evidenceRequired: "Current P/E value" },
+      { step: 3, action: "Calculate EPS growth rate: pull EPS for last 3 years from Screener.in annual P&L, compute CAGR. If quarterly data available, check QoQ EPS trend", source: "Screener.in → Profit & Loss → EPS row (annual)", evidenceRequired: "EPS for each of last 3 years, computed CAGR %" },
+      { step: 4, action: "Calculate PEG = P/E ÷ EPS growth rate %. P/E 15x, growth 30% → PEG 0.5. Then apply market cap tier: is this a small company with a low PEG?", source: "Computed from steps 1-3", evidenceRequired: "PEG ratio, market-cap-adjusted assessment" },
+      { step: 5, action: "Compare with sector: check sector average P/E. A microcap at 20x P/E in a sector averaging 50x is under-priced", source: "Screener.in, Tickertape sector comparisons", evidenceRequired: "Company P/E vs sector average P/E" },
+      { step: 6, action: "For financials: pull P/BV and ROE. ROE > P/BV = undervalued. Apply market cap tier to the P/BV assessment", source: "Screener.in → Key Ratios", evidenceRequired: "P/BV, ROE%, P/BV-to-ROE ratio" },
+      { step: 7, action: "For loss-making: use P/S ratio vs revenue growth %. Apply market cap tier similarly. Small loss-making company growing 100% can still rate well", source: "Screener.in", evidenceRequired: "P/S ratio, revenue growth %" },
     ],
-    notApplicableCondition: "NEVER — every listed company has a valuation. Use sector-appropriate metrics. For loss-making companies, use P/S or P/BV instead of P/E.",
+    notApplicableCondition: "NEVER — every listed company has a market cap and valuation. Score what exists. Megacaps get low scores by design.",
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -566,15 +570,15 @@ export const SIGNALS: Signal[] = [
   },
 ];
 
-// Total max = 39 (S3 + S4 + S10 = 5 each = 15; rest = 24)
+// Total max = 41 (S3 + S4 + S9 + S10 = 5 each = 20; rest = 21)
 export const MAX_SCORE = SIGNALS.reduce((a, s) => a + s.max, 0);
 
-// Scoring bands — proportional thresholds on the 39-point scale
-// ≥28 (72%) = STRONG BUY, 20-27 (51-69%) = WATCHLIST, 13-19 (33-50%) = INVESTIGATE, <13 = AVOID
+// Scoring bands — proportional thresholds on the 41-point scale
+// ≥29 (71%) = STRONG BUY, 21-28 (51-68%) = WATCHLIST, 14-20 (34-49%) = INVESTIGATE, <14 = AVOID
 export const BANDS = [
-  { min: 28, label: "STRONG BUY",  color: "#22c55e", bg: "#022c11", desc: "Research deeply, build position. Very rare — verify order book independently." },
-  { min: 20, label: "WATCHLIST",   color: "#f59e0b", bg: "#1c1005", desc: "Set a specific entry trigger. Wait for a catalytic event before buying." },
-  { min: 13, label: "INVESTIGATE", color: "#f97316", bg: "#1c0e05", desc: "Check blockers — can they resolve? Annual report + quarterly results needed." },
+  { min: 29, label: "STRONG BUY",  color: "#22c55e", bg: "#022c11", desc: "Research deeply, build position. Very rare — verify order book + market cap independently." },
+  { min: 21, label: "WATCHLIST",   color: "#f59e0b", bg: "#1c1005", desc: "Set a specific entry trigger. Wait for a catalytic event before buying." },
+  { min: 14, label: "INVESTIGATE", color: "#f97316", bg: "#1c0e05", desc: "Check blockers — can they resolve? Annual report + quarterly results needed." },
   { min: 0,  label: "AVOID",       color: "#ef4444", bg: "#1f0505", desc: "Do not invest. Eliminate from list entirely." },
 ] as const;
 

@@ -109,7 +109,7 @@ export default async function Leaderboard() {
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ color, fontWeight: 900, fontSize: 20, lineHeight: 1 }}>
                     {entry.total_score}
-                    <span style={{ color: "#2e4a60", fontSize: 12, fontWeight: 400 }}>/{entry.max_score ?? 39}</span>
+                    <span style={{ color: "#2e4a60", fontSize: 12, fontWeight: 400 }}>/{entry.max_score ?? 41}</span>
                   </div>
                   <div style={{ color, fontSize: 9, fontWeight: 800, letterSpacing: 1, marginTop: 2 }}>{entry.band}</div>
                   <div style={{ color: "#2e4a60", fontSize: 10, marginTop: 2 }}>{timeAgo(entry.analyzed_at)}</div>

@@ -24,7 +24,7 @@ create table if not exists reports (
   company_name      text not null,
   status            text not null default 'pending',  -- pending | analyzing | complete | failed
   total_score       integer,
-  max_score         integer default 39,
+  max_score         integer default 41,
   band              text,   -- STRONG BUY | WATCHLIST | INVESTIGATE | AVOID
   summary           text,
   analyzed_at       timestamptz,

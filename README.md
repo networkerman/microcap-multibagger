@@ -7,10 +7,10 @@ Built on the **12-Signal Framework** — a scoring system designed to find polic
 **Live scoring bands:**
 | Score | Rating |
 |---|---|
-| ≥ 28 / 39 | STRONG BUY |
-| 20–27 | WATCHLIST |
-| 13–19 | INVESTIGATE |
-| < 13 | AVOID |
+| ≥ 29 / 41 | STRONG BUY |
+| 21–28 | WATCHLIST |
+| 14–20 | INVESTIGATE |
+| < 14 | AVOID |
 
 ---
 
@@ -37,11 +37,11 @@ Built on the **12-Signal Framework** — a scoring system designed to find polic
 | S6 | Credit Rating | 2 |
 | S7 | Employee Satisfaction | 2 |
 | S8 | Long-term Expansion Plan | 2 |
-| S9 | Undervalued vs Growth (PEG) | 3 |
+| S9 | Valuation & Microcap Adv. | 5 |
 | S10 | Exponential Market & Scale | 5 |
 | S11 | Mass Life Impact | 3 |
 | S12 | Revenue Quality / Predictability | 3 |
-| | **Total** | **39** |
+| | **Total** | **41** |
 
 ---
 
