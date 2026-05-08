@@ -71,7 +71,8 @@ const DEEPSEEK_BASE = "https://api.deepseek.com/v1/chat/completions";
 async function deepseekChat(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens = 4000
+  maxTokens = 4000,
+  temperature = 0
 ): Promise<string> {
   const res = await fetch(DEEPSEEK_BASE, {
     method: "POST",
@@ -80,13 +81,13 @@ async function deepseekChat(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       max_tokens: maxTokens,
-      temperature: 0,
+      temperature,
     }),
   });
 
@@ -208,7 +209,7 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSystemPrompt(), prompt, 4000);
+  const text = await deepseekChat(buildSystemPrompt(), prompt, 4000, 0.1);
   const json = text.replace(/^```json\n?/m, "").replace(/\n?```$/m, "").trim();
 
   try {
@@ -243,7 +244,7 @@ Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks
   const systemPrompt = `You are an expert Indian stock market analyst specialising in microcap and smallcap stocks.
 Write clearly and concisely in plain prose. Do not use JSON, markdown, bullet points, or headers.`;
 
-  return deepseekChat(systemPrompt, prompt, 400);
+  return deepseekChat(systemPrompt, prompt, 400, 0.4);
 }
 
 // ─── Process a single stock ──────────────────────────────────────────────

@@ -98,8 +98,9 @@ ${QUESTIONS.map(q => `Q${q.number} (${q.timeref}): ${q.question}`).join("\n")}`;
       "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "deepseek-reasoner",
+      model: "deepseek-v4-pro",
       max_tokens: 8000,
+      temperature: 0.4,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
@@ -164,7 +165,8 @@ export const SIGNAL_GROUPS = [
 async function deepseekChat(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens = 4000
+  maxTokens = 4000,
+  temperature = 0
 ): Promise<string> {
   const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
     method: "POST",
@@ -173,9 +175,9 @@ async function deepseekChat(
       Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       max_tokens: maxTokens,
-      temperature: 0,
+      temperature,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -298,7 +300,7 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 4000);
+  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 4000, 0.1);
   const json = text.replace(/^```json\n?/m, "").replace(/\n?```$/m, "").trim();
 
   try {
@@ -344,5 +346,5 @@ Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks
 You apply the Microcap Multibagger Framework — a signal-based scoring system to find policy-driven, high-growth smallcaps.
 Write clearly and concisely in plain prose. Do not use JSON, markdown, bullet points, or headers.`;
 
-  return deepseekChat(systemPrompt, prompt, 400);
+  return deepseekChat(systemPrompt, prompt, 400, 0.4);
 }

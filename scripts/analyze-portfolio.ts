@@ -80,7 +80,7 @@ const PORTFOLIO: { symbol: string; exchange: string; name: string }[] = [
 
 // ─── DeepSeek ─────────────────────────────────────────────────────────
 
-async function deepseek(system: string, prompt: string, maxTokens = 4000): Promise<string> {
+async function deepseek(system: string, prompt: string, maxTokens = 4000, temperature = 0): Promise<string> {
   const r = await fetch(DEEPSEEK_BASE, {
     method: "POST",
     headers: {
@@ -88,10 +88,10 @@ async function deepseek(system: string, prompt: string, maxTokens = 4000): Promi
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
       max_tokens: maxTokens,
-      temperature: 0,
+      temperature,
     }),
   });
   if (!r.ok) {
@@ -162,7 +162,7 @@ Signals: ${JSON.stringify(signals, null, 2)}
 
 Return JSON: { "business_model": "<${BUSINESS_MODELS.map(m => m.id).join('|')}>", "signals": [ { "signal_id": "...", "label": "...", "score": N, "max_score": N, "reasoning": "CHECKING: ...\\nFOUND: ...\\nANALOGUE: ...\\nSCORE: ...", "sources": [...] } ] }`;
 
-  const text = await deepseek(buildSystemPrompt(), prompt, 4000);
+  const text = await deepseek(buildSystemPrompt(), prompt, 4000, 0.1);
   const json = text.replace(/^```json\n?/m, "").replace(/\n?```$/m, "").trim();
 
   try {
@@ -189,10 +189,8 @@ ${signals.map(s => `${s.signal_id} ${s.label}: ${s.score}/${s.max_score} — ${s
 
 Write a 3-5 sentence investment thesis summary. Be specific and direct. Plain text only.`;
 
-  return deepseek(
-    "You are an expert Indian stock market analyst. Write clearly in plain prose. No JSON, no markdown.",
-    prompt, 400
-  );
+  const sysPrompt = "You are an expert Indian stock market analyst. Write clearly in plain prose. No JSON, no markdown.";
+  return deepseek(sysPrompt, prompt, 400, 0.4);
 }
 
 // ─── Process one stock ────────────────────────────────────────────────
