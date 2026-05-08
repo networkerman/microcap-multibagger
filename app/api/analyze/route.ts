@@ -1,12 +1,23 @@
 import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createAuthClient } from "@/lib/supabase/server-auth";
-import { analyzeSignalGroup, generateSummary, SIGNAL_GROUPS, type SignalResult } from "@/lib/claude";
+// Signal scoring uses DeepSeek by default (cheaper, fast, good at structured JSON).
+// Falls back to Claude (lib/claude.ts) if DEEPSEEK_API_KEY is not set.
+import { analyzeSignalGroup, generateSummary, SIGNAL_GROUPS, type SignalResult } from "@/lib/deepseek";
+import { analyzeSignalGroup as claudeAnalyzeGroup, generateSummary as claudeSummary } from "@/lib/claude";
 import { getBand, MAX_SCORE } from "@/lib/signals";
 import { sendReportReadyEmail } from "@/lib/resend";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 
 export const maxDuration = 60;
+
+// Prefer DeepSeek for signal scoring; fall back to Claude if key is missing
+function getAnalyzeGroup() {
+  return process.env.DEEPSEEK_API_KEY ? analyzeSignalGroup : claudeAnalyzeGroup;
+}
+function getGenerateSummary() {
+  return process.env.DEEPSEEK_API_KEY ? generateSummary : claudeSummary;
+}
 
 // Rate limit: N analyses per IP per hour. Override via RATE_LIMIT_HOURLY env var.
 const RATE_LIMIT = parseInt(process.env.RATE_LIMIT_HOURLY ?? "5");
@@ -63,10 +74,13 @@ async function runAnalysis(
   const allSignals: SignalResult[] = [];
   let businessModel: string | null = null;
 
+  const scoreGroup = getAnalyzeGroup();
+  const summarize = getGenerateSummary();
+
   try {
     await Promise.all(
       SIGNAL_GROUPS.map(group =>
-        analyzeSignalGroup(symbol, exchange, companyName, group, dataContext)
+        scoreGroup(symbol, exchange, companyName, group, dataContext)
           .then(async ({ signals, businessModel: bm }) => {
             allSignals.push(...signals);
             if (bm && !businessModel) businessModel = bm;
@@ -83,7 +97,7 @@ async function runAnalysis(
   const band = getBand(total_score);
   let summary = "";
   try {
-    summary = await generateSummary(symbol, exchange, companyName, allSignals, band.label, total_score, MAX_SCORE, dataContext);
+    summary = await summarize(symbol, exchange, companyName, allSignals, band.label, total_score, MAX_SCORE, dataContext);
   } catch { /* non-fatal */ }
 
   await supabase.from("reports").update({
