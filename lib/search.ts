@@ -106,20 +106,34 @@ function fmt(label: string, results: SerperResult[], extraText?: string): string
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function fetchSignalContext(companyName: string): Promise<string> {
-  // Step 1 — Serper: 4 targeted searches in parallel
-  const [orderBook, creditRating, employees, news] = await Promise.all([
+  // Step 1 — Serper: 8 targeted searches in parallel, one per signal gap
+  const [
+    orderBook,   // S2
+    creditRating, // S6
+    employees,   // S7
+    news,        // S1 / S9
+    moat,        // S3 — certifications, client list
+    promoter,    // S5 — promoter background, SEBI actions
+    expansion,   // S8 — guidance, con-call transcripts
+    sectorTAM,   // S10 — TAM, PLI scheme, government programme
+  ] = await Promise.all([
     serper(`${companyName} order book backlog pipeline crores 2025`, "search", 4),
     serper(`${companyName} CRISIL ICRA CARE India Ratings credit rating 2025`, "search", 3),
     serper(`${companyName} Glassdoor AmbitionBox employee review rating`, "search", 3),
-    serper(`${companyName} order contract award government 2025`, "news", 6),
+    serper(`${companyName} order contract award government 2025`, "news", 5),
+    serper(`${companyName} certification RDSO ISO client Tier-1 government supplier approval`, "search", 3),
+    serper(`${companyName} promoter founder background SEBI order CII ASSOCHAM experience`, "search", 3),
+    serper(`${companyName} revenue target expansion plan guidance investor presentation 2025 2026`, "search", 3),
+    serper(`${companyName} sector TAM total addressable market PLI scheme NITI Aayog government programme`, "search", 3),
   ]);
 
-  // Step 2 — Jina: extract full text from top order book URL (free)
-  const orderBookExtract = orderBook[0]?.link
-    ? await jinaExtract(orderBook[0].link, 1200)
-    : "";
+  // Step 2 — Jina: extract full text from top order book URL + top moat/certifications URL (free)
+  const [orderBookExtract, moatExtract] = await Promise.all([
+    orderBook[0]?.link ? jinaExtract(orderBook[0].link, 1000) : Promise.resolve(""),
+    moat[0]?.link      ? jinaExtract(moat[0].link, 800)       : Promise.resolve(""),
+  ]);
 
-  // Step 3 — Tavily: cross-reference the order book number from a second source
+  // Step 3 — Tavily: cross-reference order book number only if Serper found a crore figure
   const orderBookXRef = orderBook[0]?.snippet?.match(/[\d,]+\s*(?:crore|cr)/i)
     ? await tavilySearch(`${companyName} order book crores 2025`, 2)
     : [];
@@ -133,6 +147,10 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
     fmt("ORDER BOOK / PIPELINE — S2 scoring", orderBook, orderBookExtract + xRefNote),
     fmt("CREDIT RATING (CRISIL/ICRA/CARE) — S6 scoring", creditRating),
     fmt("EMPLOYEE REVIEWS (Glassdoor/AmbitionBox) — S7 scoring", employees),
+    fmt("CERTIFICATIONS, CLIENTS, MOAT — S3 scoring", moat, moatExtract),
+    fmt("PROMOTER BACKGROUND & GOVERNANCE — S5 scoring", promoter),
+    fmt("EXPANSION PLAN & GUIDANCE — S8 scoring", expansion),
+    fmt("SECTOR TAM & GOVERNMENT PROGRAMMES — S10 scoring", sectorTAM),
     fmt("RECENT CONTRACTS & NEWS — S1/S9 scoring", news),
   ].filter(Boolean);
 
@@ -140,7 +158,7 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
   return (
     "\n\n═══ LIVE WEB RESEARCH (Serper + Jina + Tavily) ═══" +
     sections.join("\n") +
-    "\n\nPrioritise this data over training knowledge when it conflicts.\n" +
+    "\n\nPrioritise this live data over training knowledge when it conflicts.\n" +
     "═══════════════════════════════════════════════════════\n"
   );
 }
