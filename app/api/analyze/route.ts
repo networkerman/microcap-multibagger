@@ -8,6 +8,7 @@ import { analyzeSignalGroup as claudeAnalyzeGroup, generateSummary as claudeSumm
 import { getBand, MAX_SCORE } from "@/lib/signals";
 import { sendReportReadyEmail } from "@/lib/resend";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
+import { fetchTavilyContext } from "@/lib/tavily";
 
 export const maxDuration = 60;
 
@@ -62,8 +63,11 @@ async function runAnalysis(
   exchange: string,
   companyName: string,
 ) {
-  const screenerData = await fetchScreenerData(symbol, exchange);
-  const dataContext = screenerData ? formatScreenerContext(screenerData) : "";
+  const [screenerData, tavilyContext] = await Promise.all([
+    fetchScreenerData(symbol, exchange),
+    fetchTavilyContext(companyName),
+  ]);
+  const dataContext = (screenerData ? formatScreenerContext(screenerData) : "") + tavilyContext;
 
   if (screenerData) {
     await supabase.from("reports")
