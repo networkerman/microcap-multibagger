@@ -47,6 +47,7 @@ import {
   type BusinessModel,
 } from "../lib/signals";
 import { fetchScreenerData, formatScreenerContext } from "../lib/screener";
+import { fetchSignalContext } from "../lib/search";
 
 // Inlined from lib/claude.ts to avoid importing the Anthropic SDK
 const SIGNAL_GROUPS = [
@@ -261,12 +262,16 @@ async function rescoreStock(report: ReportRow): Promise<{
 }> {
   const { id, symbol, exchange, company_name: companyName } = report;
 
-  // 1. Fetch fresh Screener.in data
+  // 1. Fetch Screener + web search in parallel
   let dataContext = "";
   try {
-    const sd = await fetchScreenerData(symbol, exchange);
+    const [sd, searchCtx] = await Promise.all([
+      fetchScreenerData(symbol, exchange),
+      fetchSignalContext(companyName),
+    ]);
     if (sd) dataContext = formatScreenerContext(sd);
-  } catch { /* proceed without Screener data */ }
+    if (searchCtx) dataContext += searchCtx;
+  } catch { /* proceed without */ }
 
   // 2. Score 3 signal groups in parallel
   const results = await Promise.all(

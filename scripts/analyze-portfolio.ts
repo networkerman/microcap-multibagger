@@ -32,6 +32,7 @@ const SIGNAL_GROUPS = [
   ["S5", "S6", "S7", "S8", "S11"],
 ] as const;
 import { fetchScreenerData, formatScreenerContext } from "../lib/screener";
+import { fetchSignalContext } from "../lib/search";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -198,7 +199,14 @@ Write a 3-5 sentence investment thesis summary. Be specific and direct. Plain te
 async function analyzeStock(sym: string, exchange: string, companyName: string) {
   // Fetch Screener data
   let dataContext = "";
-  try { const sd = await fetchScreenerData(sym, exchange); if (sd) dataContext = formatScreenerContext(sd); } catch {}
+  try {
+    const [sd, searchCtx] = await Promise.all([
+      fetchScreenerData(sym, exchange),
+      fetchSignalContext(companyName),
+    ]);
+    if (sd) dataContext = formatScreenerContext(sd);
+    if (searchCtx) dataContext += searchCtx;
+  } catch {}
 
   // 3 parallel groups
   const results = await Promise.all(
