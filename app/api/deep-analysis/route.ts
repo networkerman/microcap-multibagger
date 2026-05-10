@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { runDeepAnalysis } from "@/lib/deepseek";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
+import { fetchDeepAnalysisContext } from "@/lib/search";
 
 export const maxDuration = 120; // DeepSeek reasoner can take longer
 
@@ -80,8 +81,11 @@ export async function POST(req: Request) {
   // Run DeepSeek analysis in background (~60-120s)
   after(async () => {
     try {
-      const screenerData = await fetchScreenerData(symbol, exchange);
-      const context = screenerData ? formatScreenerContext(screenerData) : "";
+      const [screenerData, webContext] = await Promise.all([
+        fetchScreenerData(symbol, exchange),
+        fetchDeepAnalysisContext(company_name),
+      ]);
+      const context = (screenerData ? formatScreenerContext(screenerData) : "") + webContext;
       const result = await runDeepAnalysis(symbol, exchange, company_name, context);
 
       await supabase.from("deep_analyses").update({
