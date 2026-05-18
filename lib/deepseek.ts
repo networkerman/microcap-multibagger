@@ -155,11 +155,12 @@ export interface SignalResult {
   sources: string[];
 }
 
-// Same 3 parallel groups as the Claude version
+// 12 individual parallel calls — one per signal.
+// Each call generates ~500–700 tokens vs 1,500–3,000 for grouped calls,
+// making each call 3–4x faster. All 12 fire simultaneously.
 export const SIGNAL_GROUPS = [
-  ["S3", "S4", "S10"],              // A — Primary (MOAT, OPM, Exponential)
-  ["S1", "S2", "S9", "S12"],        // B — Financial/market visibility
-  ["S5", "S6", "S7", "S8", "S11"], // C — Qualitative
+  ["S1"], ["S2"], ["S3"], ["S4"], ["S5"], ["S6"],
+  ["S7"], ["S8"], ["S9"], ["S10"], ["S11"], ["S12"],
 ] as const;
 
 async function deepseekChat(
@@ -324,7 +325,7 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 8000, 0.1, `signals[${signalIds.join(",")}]`);
+  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 2000, 0.1, `signals[${signalIds.join(",")}]`);
 
   // Robust JSON extraction: strip markdown fences, then fall back to
   // finding the outermost { ... } block to handle extra preamble/postamble.

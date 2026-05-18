@@ -5,9 +5,8 @@ import { SIGNALS, getBand, MAX_SCORE, BUSINESS_MODELS, type BusinessModel, type 
 // and scores its subset of signals. Results are persisted as they arrive,
 // giving the UI progressive data.
 export const SIGNAL_GROUPS = [
-  ["S3", "S4", "S10"],              // A — Primary (MOAT, OPM, Exponential)
-  ["S1", "S2", "S9", "S12"],        // B — Financial/market visibility
-  ["S5", "S6", "S7", "S8", "S11"], // C — Qualitative
+  ["S1"], ["S2"], ["S3"], ["S4"], ["S5"], ["S6"],
+  ["S7"], ["S8"], ["S9"], ["S10"], ["S11"], ["S12"],
 ] as const;
 
 export interface SignalResult {
@@ -176,7 +175,7 @@ Return a single JSON object in exactly this shape (no markdown, no preamble):
 
   const message = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4000,
+    max_tokens: 2000,
     system: buildSystemPrompt(),
     messages: [{ role: "user", content: prompt }],
   });
