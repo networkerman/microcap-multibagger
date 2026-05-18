@@ -93,6 +93,15 @@ async function runAnalysis(
       )
     );
   } catch (err) {
+    console.error("[analyze] Signal scoring failed:", err);
+    await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
+    return;
+  }
+
+  // If all groups silently returned nothing, treat as a failure rather than
+  // marking the report "complete" with a misleading score of 0.
+  if (allSignals.length === 0) {
+    console.error("[analyze] All signal groups returned empty — marking failed:", symbol, exchange);
     await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
     return;
   }

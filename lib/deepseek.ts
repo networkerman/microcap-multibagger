@@ -300,24 +300,48 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 4000, 0.1);
-  const json = text.replace(/^```json\n?/m, "").replace(/\n?```$/m, "").trim();
+  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 8000, 0.1);
 
-  try {
-    const parsed = JSON.parse(json);
-    if (parsed.signals && Array.isArray(parsed.signals)) {
-      return {
-        businessModel: parsed.business_model ?? null,
-        signals: parsed.signals as SignalResult[],
-      };
-    }
-    if (Array.isArray(parsed)) {
-      return { businessModel: null, signals: parsed as SignalResult[] };
-    }
-    return { businessModel: null, signals: [] };
-  } catch {
-    return { businessModel: null, signals: [] };
+  // Robust JSON extraction: strip markdown fences, then fall back to
+  // finding the outermost { ... } block to handle extra preamble/postamble.
+  function extractJson(raw: string): string {
+    const stripped = raw
+      .replace(/^```json\s*/m, "")
+      .replace(/\s*```\s*$/m, "")
+      .trim();
+    if (stripped.startsWith("{")) return stripped;
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start !== -1 && end > start) return raw.slice(start, end + 1);
+    return stripped;
   }
+
+  const json = extractJson(text);
+
+  let parsed: { business_model?: string; signals?: SignalResult[] } | SignalResult[];
+  try {
+    parsed = JSON.parse(json);
+  } catch (err) {
+    // Log so we can diagnose future format changes
+    console.error("[deepseek] JSON parse failed for group", signalIds, "— raw response:", text.slice(0, 500));
+    throw new Error(`DeepSeek returned unparseable JSON for signals ${signalIds.join(",")}: ${String(err)}`);
+  }
+
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) throw new Error(`DeepSeek returned empty signals array for ${signalIds.join(",")}`);
+    return { businessModel: null, signals: parsed };
+  }
+
+  if (parsed.signals && Array.isArray(parsed.signals)) {
+    if (parsed.signals.length === 0) throw new Error(`DeepSeek returned empty signals array for ${signalIds.join(",")}`);
+    return {
+      businessModel: (parsed as { business_model?: string }).business_model ?? null,
+      signals: parsed.signals,
+    };
+  }
+
+  console.error("[deepseek] Unexpected response shape for group", signalIds, "— parsed:", JSON.stringify(parsed).slice(0, 300));
+  throw new Error(`DeepSeek response missing 'signals' array for ${signalIds.join(",")}`);
 }
 
 /**
