@@ -4,7 +4,7 @@ import { runDeepAnalysis } from "@/lib/deepseek";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 import { fetchDeepAnalysisContext } from "@/lib/search";
 
-export const maxDuration = 120; // DeepSeek reasoner can take longer
+export const maxDuration = 300;
 
 // GET — fetch existing deep analysis for a symbol
 export async function GET(req: Request) {
@@ -80,20 +80,34 @@ export async function POST(req: Request) {
 
   // Run DeepSeek analysis in background (~60-120s)
   after(async () => {
+    const t0 = Date.now();
+    const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+    console.log(`[deep-analysis:start] ${exchange}:${symbol} — "${company_name}" | analysisId=${analysisId}`);
     try {
+      console.log(`[deep-analysis:fetch] Starting Screener.in + web context in parallel`);
+      const t1 = Date.now();
       const [screenerData, webContext] = await Promise.all([
         fetchScreenerData(symbol, exchange),
         fetchDeepAnalysisContext(company_name),
       ]);
+      console.log(`[deep-analysis:fetch] Done in ${((Date.now() - t1) / 1000).toFixed(1)}s | screener=${screenerData ? "ok" : "null"} | webContext=${webContext.length} chars`);
+
       const context = (screenerData ? formatScreenerContext(screenerData) : "") + webContext;
+      console.log(`[deep-analysis:context] Total context: ${context.length} chars`);
+
+      console.log(`[deep-analysis:deepseek] Calling DeepSeek for 15-question analysis`);
+      const t2 = Date.now();
       const result = await runDeepAnalysis(symbol, exchange, company_name, context);
+      console.log(`[deep-analysis:deepseek] Done in ${((Date.now() - t2) / 1000).toFixed(1)}s | questions=${result.questions.length}`);
 
       await supabase.from("deep_analyses").update({
         questions: result.questions,
         overall_verdict: result.overall_verdict,
       }).eq("id", analysisId);
+
+      console.log(`[deep-analysis:done] ${exchange}:${symbol} completed in ${elapsed()}`);
     } catch (err) {
-      console.error("Deep analysis failed:", err);
+      console.error(`[deep-analysis:failed] ${exchange}:${symbol} after ${elapsed()}:`, err);
     }
   });
 

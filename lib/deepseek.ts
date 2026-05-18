@@ -91,14 +91,14 @@ Answer each of the following 15 questions about this specific company. Return a 
 The 15 questions:
 ${QUESTIONS.map(q => `Q${q.number} (${q.timeref}): ${q.question}`).join("\n")}`;
 
-  const res = await fetch("https://api.deepseek.com/chat/completions", {
+  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "deepseek-v4-pro",
+      model: "deepseek-v4-flash",
       max_tokens: 8000,
       temperature: 0.4,
       messages: [
