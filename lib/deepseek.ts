@@ -335,7 +335,7 @@ Return a single JSON object (no markdown, no preamble):
   if (parsed.signals && Array.isArray(parsed.signals)) {
     if (parsed.signals.length === 0) throw new Error(`DeepSeek returned empty signals array for ${signalIds.join(",")}`);
     return {
-      businessModel: (parsed as { business_model?: string }).business_model ?? null,
+      businessModel: (parsed as { business_model?: string }).business_model as BusinessModel ?? null,
       signals: parsed.signals,
     };
   }
