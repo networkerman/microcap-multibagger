@@ -10,7 +10,7 @@ import { sendReportReadyEmail } from "@/lib/resend";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 import { fetchSignalContext } from "@/lib/search";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Prefer DeepSeek for signal scoring; fall back to Claude if key is missing
 function getAnalyzeGroup() {

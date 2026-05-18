@@ -30,6 +30,8 @@ export default function StockPage() {
   const [error, setError] = useState("");
   const [showRefreshOverlay, setShowRefreshOverlay] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const analysisStarted = useRef<number | null>(null);
+  const ANALYSIS_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
   const router = useRouter();
 
   const fetchReport = async (quiet = false) => {
@@ -49,7 +51,14 @@ export default function StockPage() {
       setReport(data);
       setCompanyName(data.company_name ?? companyName);
       setStatus("analyzing");
-      pollTimer.current = setTimeout(() => fetchReport(true), 2000);
+      if (analysisStarted.current === null) analysisStarted.current = Date.now();
+      if (Date.now() - analysisStarted.current > ANALYSIS_TIMEOUT_MS) {
+        setError("Analysis is taking longer than expected. Please try again in a moment.");
+        setStatus("no-report");
+        analysisStarted.current = null;
+      } else {
+        pollTimer.current = setTimeout(() => fetchReport(true), 2000);
+      }
     } else {
       setReport(data);
       setCompanyName(data.company_name);
@@ -81,6 +90,7 @@ export default function StockPage() {
       setSubmitting(false);
       setReport(null); // will show skeleton
       setStatus("analyzing");
+      analysisStarted.current = Date.now();
       pollTimer.current = setTimeout(() => fetchReport(true), 2000);
     } catch (e: any) {
       setError(e.message);
