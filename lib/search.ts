@@ -106,6 +106,9 @@ function fmt(label: string, results: SerperResult[], extraText?: string): string
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function fetchSignalContext(companyName: string): Promise<string> {
+  const t0 = Date.now();
+  console.log(`[search:signal] Starting 8 Serper queries for "${companyName}"`);
+
   // Step 1 — Serper: 8 targeted searches in parallel, one per signal gap
   const [
     orderBook,   // S2
@@ -127,16 +130,36 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
     serper(`${companyName} sector TAM total addressable market PLI scheme NITI Aayog government programme`, "search", 3),
   ]);
 
+  console.log(
+    `[search:signal] Serper done in ${((Date.now() - t0) / 1000).toFixed(1)}s | ` +
+    `orderBook=${orderBook.length} creditRating=${creditRating.length} employees=${employees.length} ` +
+    `news=${news.length} moat=${moat.length} promoter=${promoter.length} ` +
+    `expansion=${expansion.length} sectorTAM=${sectorTAM.length}`
+  );
+
   // Step 2 — Jina: extract full text from top order book URL + top moat/certifications URL (free)
+  const t2 = Date.now();
+  const jinaOrderBookUrl = orderBook[0]?.link ?? null;
+  const jinaMoatUrl = moat[0]?.link ?? null;
+  console.log(`[search:jina] Extracting | orderBook=${jinaOrderBookUrl ?? "none"} | moat=${jinaMoatUrl ?? "none"}`);
+
   const [orderBookExtract, moatExtract] = await Promise.all([
-    orderBook[0]?.link ? jinaExtract(orderBook[0].link, 1000) : Promise.resolve(""),
-    moat[0]?.link      ? jinaExtract(moat[0].link, 800)       : Promise.resolve(""),
+    jinaOrderBookUrl ? jinaExtract(jinaOrderBookUrl, 1000) : Promise.resolve(""),
+    jinaMoatUrl      ? jinaExtract(jinaMoatUrl, 800)       : Promise.resolve(""),
   ]);
+  console.log(`[search:jina] Done in ${((Date.now() - t2) / 1000).toFixed(1)}s | orderBookExtract=${orderBookExtract.length} chars | moatExtract=${moatExtract.length} chars`);
 
   // Step 3 — Tavily: cross-reference order book number only if Serper found a crore figure
-  const orderBookXRef = orderBook[0]?.snippet?.match(/[\d,]+\s*(?:crore|cr)/i)
+  const hasCroreFigure = !!orderBook[0]?.snippet?.match(/[\d,]+\s*(?:crore|cr)/i);
+  console.log(`[search:tavily] Order book crore figure found: ${hasCroreFigure} — ${hasCroreFigure ? "running cross-reference" : "skipping"}`);
+
+  const orderBookXRef = hasCroreFigure
     ? await tavilySearch(`${companyName} order book crores 2025`, 2)
     : [];
+
+  if (orderBookXRef.length) {
+    console.log(`[search:tavily] Cross-reference returned ${orderBookXRef.length} results`);
+  }
 
   const xRefNote = orderBookXRef.length
     ? `\n  [CROSS-REFERENCE via Tavily]\n` +
@@ -153,6 +176,8 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
     fmt("SECTOR TAM & GOVERNMENT PROGRAMMES — S10 scoring", sectorTAM),
     fmt("RECENT CONTRACTS & NEWS — S1/S9 scoring", news),
   ].filter(Boolean);
+
+  console.log(`[search:signal] Total context sections: ${sections.length} | total time: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
   if (!sections.length) return "";
   return (

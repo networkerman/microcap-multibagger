@@ -56,6 +56,8 @@ async function persistSignals(supabase: ReturnType<typeof createServiceClient>, 
   );
 }
 
+function elapsed(start: number) { return `${((Date.now() - start) / 1000).toFixed(1)}s`; }
+
 async function runAnalysis(
   supabase: ReturnType<typeof createServiceClient>,
   reportId: string,
@@ -63,37 +65,58 @@ async function runAnalysis(
   exchange: string,
   companyName: string,
 ) {
+  const t0 = Date.now();
+  console.log(`[analyze:start] ${exchange}:${symbol} — "${companyName}" | reportId=${reportId}`);
+
+  // ── Step 1: Data fetching ──────────────────────────────────────────────────
+  const t1 = Date.now();
+  console.log(`[analyze:fetch] Starting Screener.in + web search in parallel`);
   const [screenerData, tavilyContext] = await Promise.all([
     fetchScreenerData(symbol, exchange),
     fetchSignalContext(companyName),
   ]);
+  console.log(`[analyze:fetch] Done in ${elapsed(t1)} | screener=${screenerData ? "ok" : "null"} | webContext=${tavilyContext.length} chars`);
+
   const dataContext = (screenerData ? formatScreenerContext(screenerData) : "") + tavilyContext;
+  console.log(`[analyze:context] Total context size: ${dataContext.length} chars`);
 
   if (screenerData) {
     await supabase.from("reports")
       .update({ company_name: screenerData.companyName })
       .eq("id", reportId);
+    console.log(`[analyze:screener] Company name updated to: "${screenerData.companyName}"`);
+  } else {
+    console.warn(`[analyze:screener] No Screener.in data found for ${exchange}:${symbol} — scoring with web context only`);
   }
 
+  // ── Step 2: Signal scoring ─────────────────────────────────────────────────
   const allSignals: SignalResult[] = [];
   let businessModel: string | null = null;
-
   const scoreGroup = getAnalyzeGroup();
   const summarize = getGenerateSummary();
+  const provider = process.env.DEEPSEEK_API_KEY ? "deepseek" : "claude";
+  console.log(`[analyze:scoring] Starting 3 signal groups in parallel via ${provider}`);
 
   try {
     await Promise.all(
-      SIGNAL_GROUPS.map(group =>
-        scoreGroup(symbol, exchange, companyName, group, dataContext)
+      SIGNAL_GROUPS.map(group => {
+        const tGroup = Date.now();
+        console.log(`[analyze:group] Starting group [${group.join(",")}]`);
+        return scoreGroup(symbol, exchange, companyName, group, dataContext)
           .then(async ({ signals, businessModel: bm }) => {
+            const scores = signals.map(s => `${s.signal_id}=${s.score}/${s.max_score}`).join(" ");
+            console.log(`[analyze:group] [${group.join(",")}] done in ${elapsed(tGroup)} | ${signals.length} signals | ${scores}`);
             allSignals.push(...signals);
-            if (bm && !businessModel) businessModel = bm;
+            if (bm && !businessModel) {
+              businessModel = bm;
+              console.log(`[analyze:group] Business model classified as: ${bm}`);
+            }
             await persistSignals(supabase, reportId, signals);
-          })
-      )
+          });
+      })
     );
   } catch (err) {
-    console.error("[analyze] Signal scoring failed:", err);
+    console.error(`[analyze:scoring] FAILED after ${elapsed(t0)}:`, err);
     await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
     return;
   }
@@ -101,17 +124,26 @@ async function runAnalysis(
   // If all groups silently returned nothing, treat as a failure rather than
   // marking the report "complete" with a misleading score of 0.
   if (allSignals.length === 0) {
-    console.error("[analyze] All signal groups returned empty — marking failed:", symbol, exchange);
+    console.error(`[analyze:scoring] All groups returned empty signals — marking failed | ${exchange}:${symbol}`);
     await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
     return;
   }
 
+  console.log(`[analyze:scoring] All groups complete in ${elapsed(t0)} | total signals: ${allSignals.length}`);
+
+  // ── Step 3: Score + summary ────────────────────────────────────────────────
   const total_score = allSignals.reduce((a, s) => a + s.score, 0);
   const band = getBand(total_score);
+  console.log(`[analyze:score] total=${total_score}/${MAX_SCORE} | band=${band.label}`);
+
   let summary = "";
   try {
+    const tSum = Date.now();
     summary = await summarize(symbol, exchange, companyName, allSignals, band.label, total_score, MAX_SCORE, dataContext);
-  } catch { /* non-fatal */ }
+    console.log(`[analyze:summary] Generated in ${elapsed(tSum)} | ${summary.length} chars`);
+  } catch (err) {
+    console.error(`[analyze:summary] Failed (non-fatal):`, err);
+  }
 
   await supabase.from("reports").update({
     status: "complete",
@@ -122,6 +154,7 @@ async function runAnalysis(
     business_model: businessModel,
     analyzed_at: new Date().toISOString(),
   }).eq("id", reportId);
+  console.log(`[analyze:done] ${exchange}:${symbol} completed in ${elapsed(t0)} | score=${total_score} | band=${band.label}`);
 
   // Notify subscribers
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://microcap-multibagger.vercel.app";

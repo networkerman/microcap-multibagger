@@ -166,22 +166,44 @@ function extractCreditRating(html: string): string {
 }
 
 export async function fetchScreenerData(symbol: string, exchange: string): Promise<ScreenerData | null> {
+  const t0 = Date.now();
+  console.log(`[screener] Resolving URL for ${exchange}:${symbol}`);
   try {
     const url = await resolveScreenerUrl(symbol, exchange);
-    if (!url) return null;
+    if (!url) {
+      console.warn(`[screener] No URL found for ${exchange}:${symbol} — not listed on Screener.in`);
+      return null;
+    }
+    console.log(`[screener] Resolved to ${url} — fetching page`);
 
     const res = await fetch(url, { headers: HEADERS });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[screener] HTTP ${res.status} fetching ${url}`);
+      return null;
+    }
+
     const html = await res.text();
-    if (!html.includes("top-ratios")) return null; // login wall or 404
+    if (!html.includes("top-ratios")) {
+      console.warn(`[screener] Login wall or 404 at ${url} — "top-ratios" not found in HTML`);
+      return null;
+    }
 
     const ratios = extractRatios(html);
     const { holding, pledging } = extractPromoterHolding(html);
     const annual = extractAnnualData(html);
     const quarterly = extractQuarterlyData(html);
+    const companyName = html.match(/<h1[^>]*>(.*?)<\/h1>/s)?.[1]
+      ? clean(html.match(/<h1[^>]*>(.*?)<\/h1>/s)![1])
+      : symbol;
+
+    console.log(
+      `[screener] OK in ${((Date.now() - t0) / 1000).toFixed(1)}s | company="${companyName}" | ` +
+      `marketCap=${ratios["Market Cap"] ?? "N/A"} | PE=${ratios["Stock P/E"] ?? "N/A"} | ` +
+      `ROCE=${ratios["ROCE"] ?? "N/A"} | promoter=${holding} | pledging=${pledging}`
+    );
 
     return {
-      companyName: html.match(/<h1[^>]*>(.*?)<\/h1>/s)?.[1] ? clean(html.match(/<h1[^>]*>(.*?)<\/h1>/s)![1]) : symbol,
+      companyName,
       screenerUrl: url,
       marketCapCr: ratios["Market Cap"] ?? "N/A",
       currentPrice: ratios["Current Price"] ?? "N/A",
@@ -203,7 +225,8 @@ export async function fetchScreenerData(symbol: string, exchange: string): Promi
       creditRating: extractCreditRating(html),
       yearHighLow: ratios["High / Low"] ?? "N/A",
     };
-  } catch {
+  } catch (err) {
+    console.error(`[screener] Exception for ${exchange}:${symbol}:`, err);
     return null;
   }
 }

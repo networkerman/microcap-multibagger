@@ -166,8 +166,12 @@ async function deepseekChat(
   systemPrompt: string,
   userPrompt: string,
   maxTokens = 4000,
-  temperature = 0
+  temperature = 0,
+  label = "chat"
 ): Promise<string> {
+  const t0 = Date.now();
+  console.log(`[deepseek:${label}] Calling API | max_tokens=${maxTokens} | promptLen=${userPrompt.length} chars`);
+
   const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -187,11 +191,31 @@ async function deepseekChat(
 
   if (!res.ok) {
     const err = await res.text();
+    console.error(`[deepseek:${label}] HTTP ${res.status} after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${err.slice(0, 300)}`);
     throw new Error(`DeepSeek API error ${res.status}: ${err.slice(0, 300)}`);
   }
 
-  const j = (await res.json()) as { choices: Array<{ message: { content: string } }> };
-  return j.choices[0].message.content;
+  const j = (await res.json()) as {
+    choices: Array<{ message: { content: string }; finish_reason: string }>;
+    usage?: { prompt_tokens: number; completion_tokens: number };
+  };
+
+  const content = j.choices[0].message.content;
+  const finishReason = j.choices[0].finish_reason;
+  const usage = j.usage;
+
+  console.log(
+    `[deepseek:${label}] Response in ${((Date.now() - t0) / 1000).toFixed(1)}s | ` +
+    `finish_reason=${finishReason} | ` +
+    `tokens: prompt=${usage?.prompt_tokens ?? "?"} completion=${usage?.completion_tokens ?? "?"} | ` +
+    `responseLen=${content.length} chars`
+  );
+
+  if (finishReason === "length") {
+    console.warn(`[deepseek:${label}] finish_reason=length — response was TRUNCATED at ${usage?.completion_tokens} tokens. Increase max_tokens or reduce prompt.`);
+  }
+
+  return content;
 }
 
 function buildSignalsSystemPrompt(): string {
@@ -300,7 +324,7 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 8000, 0.1);
+  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 8000, 0.1, `signals[${signalIds.join(",")}]`);
 
   // Robust JSON extraction: strip markdown fences, then fall back to
   // finding the outermost { ... } block to handle extra preamble/postamble.
@@ -370,5 +394,5 @@ Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks
 You apply the Microcap Multibagger Framework — a signal-based scoring system to find policy-driven, high-growth smallcaps.
 Write clearly and concisely in plain prose. Do not use JSON, markdown, bullet points, or headers.`;
 
-  return deepseekChat(systemPrompt, prompt, 400, 0.4);
+  return deepseekChat(systemPrompt, prompt, 400, 0.4, "summary");
 }
