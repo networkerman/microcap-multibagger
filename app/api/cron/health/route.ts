@@ -107,7 +107,34 @@ async function checkDeepSeek(): Promise<CheckResult> {
     const model = j.model ?? "unknown";
     return `model=${model}`;
   });
-  return { name: "DeepSeek API", ...r };
+  return { name: "DeepSeek API (signal scoring)", ...r };
+}
+
+async function checkClaude(): Promise<CheckResult> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return { name: "Claude API (deep analysis)", status: "fail", latencyMs: null, detail: "ANTHROPIC_API_KEY not set" };
+  const r = await timed(async () => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1,
+        messages: [{ role: "user", content: "ping" }],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`HTTP ${res.status}: ${err.slice(0, 100)}`);
+    }
+    const j = await res.json();
+    return `model=${j.model ?? "unknown"}`;
+  });
+  return { name: "Claude API (deep analysis)", ...r };
 }
 
 async function checkSerper(): Promise<CheckResult> {
@@ -232,6 +259,7 @@ export async function GET(req: Request) {
     checkSearchApi(),
     checkSupabase(),
     checkDeepSeek(),
+    checkClaude(),
     checkSerper(),
     checkTavily(),
     checkScreener(),
