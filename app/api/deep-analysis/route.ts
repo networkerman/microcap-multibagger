@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { runDeepAnalysis } from "@/lib/deepseek";
+import { runDeepAnalysis } from "@/lib/claude";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 import { fetchDeepAnalysisContext } from "@/lib/search";
 
