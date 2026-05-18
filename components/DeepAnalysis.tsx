@@ -117,8 +117,8 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
             Go deeper — 15 Honest Questions
           </h3>
           <p style={{ color: "#7a9ab5", fontSize: 13, lineHeight: 1.7, maxWidth: 520, margin: "0 auto 8px" }}>
-            Powered by <strong style={{ color: "#c8d8e8" }}>DeepSeek Reasoner</strong> — a deep-thinking AI that researches this company
-            across three dimensions: the business, the management, and the price you're paying.
+            A deep-thinking AI researches this company across three dimensions: the business,
+            the management, and the price you're paying.
           </p>
           <p style={{ color: "#5a7a94", fontSize: 12, lineHeight: 1.6, maxWidth: 500, margin: "0 auto 16px" }}>
             Inspired by Vishal Khandelwal's investor thinking framework from <em>Safal Niveshak</em>.
@@ -143,7 +143,7 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
             🔍 Analyse Further — Free
           </button>
           <p style={{ color: "#2e4a60", fontSize: 11, marginTop: 10 }}>
-            Takes ~60–90 seconds · Powered by DeepSeek Reasoner v1
+            Takes ~60–90 seconds · Results cached for future visitors
           </p>
         </div>
       )}
@@ -155,7 +155,7 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
             <span className="mmb-live-dot" style={{ width: 12, height: 12 }} />
           </div>
           <div style={{ color: "#22c55e", fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
-            DeepSeek Reasoner is thinking…
+            Analysis in progress…
           </div>
           <div style={{ color: "#5a7a94", fontSize: 13, lineHeight: 1.6 }}>
             Researching all 15 questions from annual reports, BSE/NSE filings, and public data.
@@ -172,7 +172,7 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
           {analysis.overall_verdict && (
             <div style={{ background: "#0a1824", border: "1px solid #f59e0b44", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
               <div style={{ color: "#f59e0b", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8 }}>
-                DEEPSEEK REASONER · OVERALL VERDICT
+                OVERALL VERDICT
               </div>
               <p style={{ color: "#c8d8e8", fontSize: 14, lineHeight: 1.75, margin: 0 }}>
                 {analysis.overall_verdict}
@@ -262,8 +262,7 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
                 FOUND THIS USEFUL?
               </div>
               <p style={{ color: "#7a9ab5", fontSize: 13, lineHeight: 1.65, margin: 0 }}>
-                This deep analysis ran on <strong style={{ color: "#c8d8e8" }}>DeepSeek Reasoner</strong> and consumed
-                ~50,000–80,000 reasoning tokens — costing roughly <strong style={{ color: "#c8d8e8" }}>₹70–80 in API fees</strong>.
+                This deep analysis is powered by AI and costs real money to run.
                 If it helped your research, buying me a coffee keeps this tool free for everyone.
               </p>
             </div>
@@ -288,7 +287,7 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
           </div>
 
           <div style={{ textAlign: "center", color: "#1a2e40", fontSize: 10, marginTop: 12 }}>
-            Analysed by DeepSeek Reasoner ·{" "}
+            Analysed by AI ·{" "}
             {new Date(analysis.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
             {" "}· Not financial advice
           </div>
