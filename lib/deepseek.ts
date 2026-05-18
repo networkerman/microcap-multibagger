@@ -98,7 +98,7 @@ ${QUESTIONS.map(q => `Q${q.number} (${q.timeref}): ${q.question}`).join("\n")}`;
       "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "deepseek-v4-flash",
+      model: "deepseek-v4-pro",
       max_tokens: 8000,
       temperature: 0.4,
       messages: [
