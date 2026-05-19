@@ -97,29 +97,28 @@ async function runAnalysis(
   const provider = process.env.DEEPSEEK_API_KEY ? "deepseek" : "claude";
   console.log(`[analyze:scoring] Starting 3 signal groups in parallel via ${provider}`);
 
-  try {
-    await Promise.all(
-      SIGNAL_GROUPS.map(group => {
-        const tGroup = Date.now();
-        console.log(`[analyze:group] Starting group [${group.join(",")}]`);
-        return scoreGroup(symbol, exchange, companyName, group, dataContext)
-          .then(async ({ signals, businessModel: bm }) => {
-            const scores = signals.map(s => `${s.signal_id}=${s.score}/${s.max_score}`).join(" ");
-            console.log(`[analyze:group] [${group.join(",")}] done in ${elapsed(tGroup)} | ${signals.length} signals | ${scores}`);
-            allSignals.push(...signals);
-            if (bm && !businessModel) {
-              businessModel = bm;
-              console.log(`[analyze:group] Business model classified as: ${bm}`);
-            }
-            await persistSignals(supabase, reportId, signals);
-          });
-      })
-    );
-  } catch (err) {
-    console.error(`[analyze:scoring] FAILED after ${elapsed(t0)}:`, err);
-    await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
-    return;
-  }
+  await Promise.all(
+    SIGNAL_GROUPS.map(group => {
+      const tGroup = Date.now();
+      console.log(`[analyze:group] Starting group [${group.join(",")}]`);
+      return scoreGroup(symbol, exchange, companyName, group, dataContext)
+        .then(async ({ signals, businessModel: bm }) => {
+          const scores = signals.map(s => `${s.signal_id}=${s.score}/${s.max_score}`).join(" ");
+          console.log(`[analyze:group] [${group.join(",")}] done in ${elapsed(tGroup)} | ${signals.length} signals | ${scores}`);
+          allSignals.push(...signals);
+          if (bm && !businessModel) {
+            businessModel = bm;
+            console.log(`[analyze:group] Business model classified as: ${bm}`);
+          }
+          await persistSignals(supabase, reportId, signals);
+        })
+        .catch(err => {
+          // One signal failing must not kill the whole analysis.
+          // Log it and continue — the report will complete with the remaining signals.
+          console.error(`[analyze:group] [${group.join(",")}] FAILED after ${elapsed(tGroup)} — skipping:`, err);
+        });
+    })
+  );
 
   // If all groups silently returned nothing, treat as a failure rather than
   // marking the report "complete" with a misleading score of 0.
