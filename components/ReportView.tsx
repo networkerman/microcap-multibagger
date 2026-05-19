@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SIGNALS, getBand, MAX_SCORE } from "@/lib/signals";
 import SaveButton from "@/components/SaveButton";
 import SaveCTA from "@/components/SaveCTA";
@@ -65,11 +65,48 @@ const BAND_BG: Record<string, string> = {
   "INVESTIGATE": "#1c0e05", "AVOID": "#1f0505",
 };
 
+const WORK_MESSAGES = [
+  "Fetching annual reports from BSE filings…",
+  "Scanning promoter shareholding patterns…",
+  "Checking credit rating disclosures…",
+  "Analysing quarterly revenue trends…",
+  "Searching for order book announcements…",
+  "Cross-referencing Screener.in data…",
+  "Contacting the promoters…",
+  "Scanning Reg 30 exchange filings…",
+  "Checking for SEBI disclosures…",
+  "Researching sector tailwinds…",
+  "Verifying MOAT indicators…",
+  "Looking up AmbitionBox employee ratings…",
+  "Calculating PEG ratio and valuation…",
+  "Scanning investor presentations…",
+  "Checking for pledged shares…",
+  "Reading the MD&A section…",
+  "Verifying CRISIL / ICRA credit ratings…",
+  "Cross-checking Glassdoor reviews…",
+  "Looking for government scheme allocations…",
+  "Digging through con-call transcripts…",
+];
+
 export default function ReportView({ report, onRequestRefresh }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
+  const [workMsgIdx, setWorkMsgIdx] = useState(0);
+  const workTimer = useRef<ReturnType<typeof setInterval>>(null);
 
   const isAnalyzing = report.status === "analyzing";
+
+  // Cycle through work messages every 2.5s while waiting for first signals
+  useEffect(() => {
+    if (isAnalyzing && report.report_signals.length === 0) {
+      workTimer.current = setInterval(() => {
+        setWorkMsgIdx(i => (i + 1) % WORK_MESSAGES.length);
+      }, 2500);
+    } else {
+      if (workTimer.current) clearInterval(workTimer.current);
+    }
+    return () => { if (workTimer.current) clearInterval(workTimer.current); };
+  }, [isAnalyzing, report.report_signals.length]);
 
   // During analysis, compute live score from available signals (not report.total_score which is 0)
   const liveScore = isAnalyzing
@@ -186,10 +223,17 @@ export default function ReportView({ report, onRequestRefresh }: Props) {
               <span style={{ fontSize: 20, color: "#2e4a60", fontWeight: 700 }}>/ {max}</span>
             </div>
             {isAnalyzing && (
-              <div style={{ color: "#3d5a73", fontSize: 12, marginTop: 4 }}>
-                {scoredCount === 0
-                  ? "Claude is researching signals…"
-                  : `${scoredCount} of 12 signals scored — updating live`}
+              <div style={{ color: "#3d5a73", fontSize: 12, marginTop: 4, minHeight: 18 }}>
+                {scoredCount === 0 ? (
+                  <span
+                    key={workMsgIdx}
+                    style={{ animation: "mmb-fade-in 0.5s ease" }}
+                  >
+                    {WORK_MESSAGES[workMsgIdx]}
+                  </span>
+                ) : (
+                  `${scoredCount} of 12 signals scored — updating live`
+                )}
               </div>
             )}
           </div>
