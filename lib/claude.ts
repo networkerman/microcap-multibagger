@@ -175,7 +175,7 @@ Return a single JSON object in exactly this shape (no markdown, no preamble):
 
   const message = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2000,
+    max_tokens: 3000,
     system: buildSystemPrompt(),
     messages: [{ role: "user", content: prompt }],
   });

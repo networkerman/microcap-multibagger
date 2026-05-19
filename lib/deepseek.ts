@@ -325,7 +325,7 @@ Return a single JSON object (no markdown, no preamble):
   ]
 }`;
 
-  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 2000, 0.1, `signals[${signalIds.join(",")}]`);
+  const text = await deepseekChat(buildSignalsSystemPrompt(), prompt, 3000, 0.1, `signals[${signalIds.join(",")}]`);
 
   // Robust JSON extraction: strip markdown fences, then fall back to
   // finding the outermost { ... } block to handle extra preamble/postamble.
