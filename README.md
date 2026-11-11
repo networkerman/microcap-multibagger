@@ -50,7 +50,7 @@ Built on the **12-Signal Framework** — a scoring system designed to find polic
 - **Frontend + API**: Next.js 16 (App Router, TypeScript)
 - **Database**: Supabase (Postgres)
 - **Stock instrument list**: [Kite API](https://api.kite.trade/instruments) — NSE + BSE, ~10k EQ stocks, no auth required
-- **AI scoring**: Claude Sonnet (`claude-sonnet-4-6`) via Anthropic API
+- **AI scoring**: Claude Fable 5.2 (`claude-fable-5-2`) via Anthropic API (web route uses DeepSeek when `DEEPSEEK_API_KEY` is set)
 - **Email notifications**: Resend
 - **Hosting**: Vercel
 

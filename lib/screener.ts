@@ -52,8 +52,16 @@ function clean(s: string): string {
 // BSE SME stocks use numeric BSE codes (e.g. /company/544224/).
 async function resolveScreenerUrl(symbol: string, exchange: string): Promise<string | null> {
   try {
-    const res = await fetch(`${SCREENER_BASE}/api/company/search/?q=${encodeURIComponent(symbol)}`, { headers: HEADERS });
-    const results: Array<{ id: number; name: string; url: string }> = await res.json();
+    const search = async (q: string): Promise<Array<{ id: number; name: string; url: string }>> =>
+      (await fetch(`${SCREENER_BASE}/api/company/search/?q=${encodeURIComponent(q)}`, { headers: HEADERS })).json();
+
+    let results = await search(symbol);
+    // Exchange series suffixes (AIMTRON-SM, KRN-BE) are not part of Screener's symbol.
+    const base = symbol.replace(/-(BE|BZ|SM|ST|BL|IL|E1|X1)$/, "");
+    if (!results.length && base !== symbol) {
+      symbol = base;
+      results = await search(symbol);
+    }
     if (!results.length) return null;
 
     // Prefer exact symbol match, fall back to first result
@@ -94,11 +102,23 @@ function extractTableSection(html: string, sectionId: string, rowLabel: string):
 }
 
 function extractPromoterHolding(html: string): { holding: string; pledging: string } {
-  // Look in shareholding section
-  const holdingMatch = html.match(/Promoter[^%\d]*?([\d\.]+)\s*%/);
-  const pledgeMatch = html.match(/Pledged[^%\d]*?([\d\.]+)\s*%/i);
+  // Read the Promoters row of the quarterly shareholding table. Matching the
+  // first "Promoter ... %" on the page instead picks up the pros/cons bullet
+  // ("Promoter holding has decreased over last quarter: -0.44%").
+  const section = html.match(/id="shareholding".*?<\/section>/s)?.[0] ?? "";
+  const table = section.match(/id="quarterly-shp".*?<\/table>/s)?.[0] ?? section;
+  const row = table.match(/<tr[^>]*>(?:(?!<\/tr>).)*?Promoters(?:(?!<\/tr>).)*<\/tr>/s)?.[0] ?? "";
+  const values = [...row.matchAll(/>\s*([\d.]+)%\s*</g)].map(m => m[1]);
+  const latest = values.at(-1);
+  const holding = !latest
+    ? (section ? "No promoter group listed in the shareholding pattern (widely held)" : "Not disclosed")
+    : values.length > 1 && values[0] !== latest
+      ? `${latest}% (was ${values[0]}% ${values.length - 1} quarters earlier)`
+      : `${latest}%`;
+
+  const pledgeMatch = html.match(/pledged\s+([\d.]+)\s*%/i);
   return {
-    holding: holdingMatch?.[1] ? holdingMatch[1] + "%" : "Not disclosed",
+    holding,
     pledging: pledgeMatch?.[1] ? pledgeMatch[1] + "%" : "0% (not pledged)",
   };
 }

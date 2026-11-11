@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# personal portfolio data — never commit
+/portfolio-runs/
+holdings*.csv
