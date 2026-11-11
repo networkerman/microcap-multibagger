@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SIGNALS, getBand, MAX_SCORE, BUSINESS_MODELS, type BusinessModel, type BusinessModelInfo } from "./signals";
+import { SIGNALS, BUSINESS_MODELS, type BusinessModel } from "./signals";
 
 // Three parallel groups. Each group independently classifies the business model
 // and scores its subset of signals. Results are persisted as they arrive,

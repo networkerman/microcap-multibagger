@@ -63,7 +63,7 @@ function LoginForm() {
         <div style={{ color: "#5a7a94", fontSize: 14, lineHeight: 1.6 }}>
           {prefillEmail
             ? <>Get this analysis emailed to <strong style={{ color: "#c8d8e8" }}>{prefillEmail}</strong> and save it to your watchlist.<br /></>
-            : <>We'll email you your completed analyses and let you build a personal watchlist.<br /></>
+            : <>We&apos;ll email you your completed analyses and let you build a personal watchlist.<br /></>
           }
           <span style={{ color: "#3d5a73" }}>Magic link sign-in — no password required.</span>
         </div>

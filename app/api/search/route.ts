@@ -5,7 +5,9 @@ import { createServiceClient } from "@/lib/supabase/server";
 // Uses Postgres full-text search on name + exact prefix match on symbol.
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q")?.trim() ?? "";
+  // The query is interpolated into a PostgREST filter string, where , ( ) and
+  // wildcards are syntax. Keep only what a symbol or company name can contain.
+  const q = (searchParams.get("q") ?? "").replace(/[^\p{L}\p{N} &.'-]/gu, "").trim().slice(0, 50);
 
   if (q.length < 2) return NextResponse.json([]);
 

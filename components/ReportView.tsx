@@ -15,7 +15,7 @@ interface SignalResult {
   sources: string[];
 }
 
-interface Report {
+export interface Report {
   id: string;
   symbol: string;
   exchange: string;

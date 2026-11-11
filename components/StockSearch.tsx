@@ -20,7 +20,7 @@ export default function StockSearch() {
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
-    if (query.length < 2) { setResults([]); setOpen(false); return; }
+    if (query.length < 2) return;
 
     debounce.current = setTimeout(async () => {
       setLoading(true);
@@ -48,7 +48,12 @@ export default function StockSearch() {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => {
+              const value = e.target.value;
+              setQuery(value);
+              // Too short to search: clear the dropdown here rather than in the effect.
+              if (value.length < 2) { setResults([]); setOpen(false); }
+            }}
             onFocus={() => results.length > 0 && setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
             placeholder="Search by company name or NSE/BSE symbol…"
@@ -114,7 +119,7 @@ export default function StockSearch() {
           background: "#0c1d2c", border: "1px solid #1e3448", borderRadius: 12,
           padding: "16px", color: "#3d5a73", fontSize: 13, textAlign: "center",
         }}>
-          No stocks found for "{query}"
+          No stocks found for &quot;{query}&quot;
         </div>
       )}
     </div>

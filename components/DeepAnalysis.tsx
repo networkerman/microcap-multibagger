@@ -86,8 +86,8 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
         // Background job running — start polling every 4s
         pollTimer.current = setTimeout(() => checkExisting(true), 4000);
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       setTriggered(false);
       setAnalysing(false);
     }
@@ -118,10 +118,10 @@ export default function DeepAnalysis({ reportId, symbol, exchange, companyName, 
           </h3>
           <p style={{ color: "#7a9ab5", fontSize: 13, lineHeight: 1.7, maxWidth: 520, margin: "0 auto 8px" }}>
             A deep-thinking AI researches this company across three dimensions: the business,
-            the management, and the price you're paying.
+            the management, and the price you&apos;re paying.
           </p>
           <p style={{ color: "#5a7a94", fontSize: 12, lineHeight: 1.6, maxWidth: 500, margin: "0 auto 16px" }}>
-            Inspired by Vishal Khandelwal's investor thinking framework from <em>Safal Niveshak</em>.
+            Inspired by Vishal Khandelwal&apos;s investor thinking framework from <em>Safal Niveshak</em>.
             Every answer is grounded in company-specific facts — not generic platitudes.
           </p>
 

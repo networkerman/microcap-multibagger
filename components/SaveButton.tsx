@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 
 export default function SaveButton({ symbol, exchange, compact = false }: Props) {
   const router = useRouter();
-  const [user, setUser] = useState<any>(undefined); // undefined = loading, null = logged out
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading, null = logged out
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,7 @@ export default function SaveButton({ symbol, exchange, compact = false }: Props)
     if (!user) return;
     fetch(`/api/watchlist`)
       .then(r => r.json())
-      .then((list: any[]) => {
+      .then((list: { symbol: string; exchange: string }[]) => {
         setSaved(list.some(w => w.symbol === symbol && w.exchange === exchange));
       })
       .catch(() => {});

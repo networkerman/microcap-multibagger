@@ -3,6 +3,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { runDeepAnalysis } from "@/lib/claude";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 import { fetchDeepAnalysisContext } from "@/lib/search";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+
+// Deep analyses per IP per hour. Each one is a long, expensive model call.
+const RATE_LIMIT = parseInt(process.env.DEEP_ANALYSIS_RATE_LIMIT_HOURLY ?? "3");
+// A placeholder younger than this is a run still in progress, not a failure.
+const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
 export const maxDuration = 300;
 
@@ -24,38 +30,55 @@ export async function GET(req: Request) {
     .eq("exchange", exchange)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return NextResponse.json(data ?? null);
 }
 
 // POST — trigger deep analysis (free, no payment required)
 export async function POST(req: Request) {
-  const { report_id, symbol, exchange, company_name } = await req.json() as {
-    report_id: string;
-    symbol: string;
-    exchange: string;
-    company_name: string;
-  };
+  const { report_id } = await req.json() as { report_id?: string };
 
-  if (!report_id || !symbol || !exchange) {
-    return NextResponse.json({ error: "report_id, symbol, exchange required" }, { status: 400 });
+  if (!report_id) {
+    return NextResponse.json({ error: "report_id required" }, { status: 400 });
   }
 
   const supabase = createServiceClient();
 
-  // Return cached result if one already exists
+  // The report is the source of truth for what gets analysed: symbol, exchange
+  // and company name come from it, never from the request body.
+  const { data: report } = await supabase
+    .from("reports")
+    .select("id, symbol, exchange, company_name, status")
+    .eq("id", report_id)
+    .maybeSingle();
+
+  if (!report || report.status !== "complete") {
+    return NextResponse.json({ error: "No completed report to analyse" }, { status: 404 });
+  }
+  const { symbol, exchange, company_name } = report;
+
+  // Return the existing analysis if it is finished, or still being produced.
   const { data: existing } = await supabase
     .from("deep_analyses")
-    .select("id, questions")
+    .select("id, questions, created_at")
     .eq("symbol", symbol)
     .eq("exchange", exchange)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (existing && (existing.questions as any[])?.length > 0) {
+  const finished = Array.isArray(existing?.questions) && existing.questions.length > 0;
+  const running = !!existing && !finished && Date.now() - new Date(existing.created_at).getTime() < RUN_TIMEOUT_MS;
+  if (existing && (finished || running)) {
     return NextResponse.json({ ok: true, analysis_id: existing.id, cached: true });
+  }
+
+  if (!(await checkRateLimit(supabase, clientIp(req), "deep-analysis", RATE_LIMIT))) {
+    return NextResponse.json(
+      { error: `Rate limit reached. Max ${RATE_LIMIT} deep analyses per hour per IP.` },
+      { status: 429 }
+    );
   }
 
   // Insert placeholder row so client can poll
@@ -78,7 +101,7 @@ export async function POST(req: Request) {
 
   const analysisId = placeholder.id;
 
-  // Run DeepSeek analysis in background (~60-120s)
+  // Run the 15-question analysis in the background (it can take several minutes)
   after(async () => {
     const t0 = Date.now();
     const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -95,10 +118,10 @@ export async function POST(req: Request) {
       const context = (screenerData ? formatScreenerContext(screenerData) : "") + webContext;
       console.log(`[deep-analysis:context] Total context: ${context.length} chars`);
 
-      console.log(`[deep-analysis:deepseek] Calling DeepSeek for 15-question analysis`);
+      console.log(`[deep-analysis:model] Starting 15-question analysis`);
       const t2 = Date.now();
       const result = await runDeepAnalysis(symbol, exchange, company_name, context);
-      console.log(`[deep-analysis:deepseek] Done in ${((Date.now() - t2) / 1000).toFixed(1)}s | questions=${result.questions.length}`);
+      console.log(`[deep-analysis:model] Done in ${((Date.now() - t2) / 1000).toFixed(1)}s | questions=${result.questions.length}`);
 
       await supabase.from("deep_analyses").update({
         questions: result.questions,
