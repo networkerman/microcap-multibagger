@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 const STORAGE_KEY = "mmb_email";
@@ -14,7 +15,7 @@ interface Props {
 
 export default function SaveCTA({ position }: Props) {
   const router = useRouter();
-  const [user, setUser] = useState<any>(undefined);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
     const supabase = createClient();

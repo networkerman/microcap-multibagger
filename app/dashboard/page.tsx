@@ -5,6 +5,18 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server-auth";
 import { createServiceClient } from "@/lib/supabase/server";
 
+interface WatchlistItem {
+  symbol: string;
+  exchange: string;
+  saved_at: string;
+  company_name?: string;
+  total_score?: number | null;
+  max_score?: number | null;
+  band?: string | null;
+  status?: string;
+  analyzed_at?: string | null;
+}
+
 const BAND_COLOR: Record<string, string> = {
   "STRONG BUY": "#22c55e",
   "WATCHLIST":  "#f59e0b",
@@ -34,7 +46,7 @@ export default async function DashboardPage() {
     .order("saved_at", { ascending: false });
 
   // Enrich with current report data
-  let enriched: any[] = [];
+  let enriched: WatchlistItem[] = [];
   if (watchlist && watchlist.length > 0) {
     const { data: reports } = await supabase
       .from("reports")
@@ -73,7 +85,7 @@ export default async function DashboardPage() {
             <div style={{ fontSize: 32, marginBottom: 14 }}>☆</div>
             <div style={{ color: "#c8d8e8", fontWeight: 600, fontSize: 16, marginBottom: 8 }}>No saved stocks yet</div>
             <div style={{ color: "#3d5a73", fontSize: 13, marginBottom: 24 }}>
-              Search for any NSE or BSE stock and click "Save to watchlist" after viewing its analysis.
+              Search for any NSE or BSE stock and click &quot;Save to watchlist&quot; after viewing its analysis.
             </div>
             <Link href="/">
               <button style={{ background: "#f59e0b", border: "none", borderRadius: 9, padding: "10px 24px", color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
@@ -85,8 +97,8 @@ export default async function DashboardPage() {
 
         {/* Watchlist cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {enriched.map((item: any) => {
-            const color = BAND_COLOR[item.band] ?? "#5a7a94";
+          {enriched.map(item => {
+            const color = BAND_COLOR[item.band ?? ""] ?? "#5a7a94";
             const pct = item.total_score && item.max_score
               ? Math.round((item.total_score / item.max_score) * 100)
               : 0;

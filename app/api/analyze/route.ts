@@ -5,7 +5,8 @@ import { createAuthClient } from "@/lib/supabase/server-auth";
 // Falls back to Claude (lib/claude.ts) if DEEPSEEK_API_KEY is not set.
 import { analyzeSignalGroup, generateSummary, SIGNAL_GROUPS, type SignalResult } from "@/lib/deepseek";
 import { analyzeSignalGroup as claudeAnalyzeGroup, generateSummary as claudeSummary } from "@/lib/claude";
-import { getBand, MAX_SCORE } from "@/lib/signals";
+import { getBand, MAX_SCORE, SIGNALS } from "@/lib/signals";
+import { checkRateLimit, clientIp, findInstrument } from "@/lib/rate-limit";
 import { sendReportReadyEmail } from "@/lib/resend";
 import { fetchScreenerData, formatScreenerContext } from "@/lib/screener";
 import { fetchSignalContext } from "@/lib/search";
@@ -22,24 +23,11 @@ function getGenerateSummary() {
 
 // Rate limit: N analyses per IP per hour. Override via RATE_LIMIT_HOURLY env var.
 const RATE_LIMIT = parseInt(process.env.RATE_LIMIT_HOURLY ?? "5");
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-async function checkRateLimit(ip: string, supabase: ReturnType<typeof createServiceClient>): Promise<boolean> {
-  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-
-  const { count } = await supabase
-    .from("rate_limit_log")
-    .select("*", { count: "exact", head: true })
-    .eq("ip", ip)
-    .eq("endpoint", "analyze")
-    .gte("created_at", windowStart);
-
-  if ((count ?? 0) >= RATE_LIMIT) return false;
-
-  // Log this request (fire and forget — don't block the response)
-  supabase.from("rate_limit_log").insert({ ip, endpoint: "analyze" }).then(() => {});
-  return true;
-}
+const REPORT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const REFRESH_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+// An "analyzing" report older than this is treated as abandoned and may be restarted.
+const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
 async function persistSignals(supabase: ReturnType<typeof createServiceClient>, reportId: string, signals: SignalResult[]) {
   if (signals.length === 0) return;
@@ -95,10 +83,10 @@ async function runAnalysis(
   const scoreGroup = getAnalyzeGroup();
   const summarize = getGenerateSummary();
   const provider = process.env.DEEPSEEK_API_KEY ? "deepseek" : "claude";
-  console.log(`[analyze:scoring] Starting 3 signal groups in parallel via ${provider}`);
+  console.log(`[analyze:scoring] Starting ${SIGNAL_GROUPS.length} signal calls in parallel via ${provider}`);
 
-  await Promise.all(
-    SIGNAL_GROUPS.map(group => {
+  const scoreGroups = (groups: readonly (readonly string[])[]) => Promise.all(
+    groups.map(group => {
       const tGroup = Date.now();
       console.log(`[analyze:group] Starting group [${group.join(",")}]`);
       return scoreGroup(symbol, exchange, companyName, group, dataContext)
@@ -115,15 +103,22 @@ async function runAnalysis(
         .catch(err => {
           // One signal failing must not kill the whole analysis.
           // Log it and continue — the report will complete with the remaining signals.
-          console.error(`[analyze:group] [${group.join(",")}] FAILED after ${elapsed(tGroup)} — skipping:`, err);
+          console.error(`[analyze:group] [${group.join(",")}] FAILED after ${elapsed(tGroup)}:`, err);
         });
     })
   );
 
-  // If all groups silently returned nothing, treat as a failure rather than
-  // marking the report "complete" with a misleading score of 0.
-  if (allSignals.length === 0) {
-    console.error(`[analyze:scoring] All groups returned empty signals — marking failed | ${exchange}:${symbol}`);
+  await scoreGroups(SIGNAL_GROUPS);
+
+  // Retry whatever is missing once. A total built from fewer than all signals
+  // understates the score, so an incomplete report is marked failed, never complete.
+  const missing = () => SIGNALS.filter(s => !allSignals.some(r => r.signal_id === s.id)).map(s => s.id);
+  if (missing().length) {
+    console.warn(`[analyze:scoring] Retrying missing signals: ${missing().join(",")}`);
+    await scoreGroups(missing().map(id => [id]));
+  }
+  if (missing().length) {
+    console.error(`[analyze:scoring] Still missing ${missing().join(",")} — marking failed | ${exchange}:${symbol}`);
     await supabase.from("reports").update({ status: "failed" }).eq("id", reportId);
     return;
   }
@@ -175,19 +170,50 @@ async function runAnalysis(
 }
 
 export async function POST(req: Request) {
-  const { symbol, exchange, companyName, email } = await req.json() as {
-    symbol: string; exchange: string; companyName: string; email?: string;
-  };
+  const body = await req.json() as { symbol?: string; exchange?: string; email?: string };
+  const symbol = body.symbol?.trim().toUpperCase();
+  const exchange = body.exchange?.trim().toUpperCase();
+  const email = body.email?.trim();
 
-  if (!symbol || !exchange || !companyName) {
-    return NextResponse.json({ error: "symbol, exchange, companyName required" }, { status: 400 });
+  if (!symbol || !exchange) {
+    return NextResponse.json({ error: "symbol and exchange required" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+
+  // Only listed instruments can be analysed, and the company name comes from our table.
+  const instrument = await findInstrument(supabase, symbol, exchange);
+  if (!instrument) {
+    return NextResponse.json({ error: "Unknown instrument" }, { status: 404 });
+  }
+  const companyName = instrument.name;
+
+  // A fresh report, or one already being built, is returned as-is. Without this
+  // any caller could wipe a finished report and trigger a paid re-analysis.
+  const { data: existing } = await supabase
+    .from("reports")
+    .select("id, status, expires_at, analyzed_at")
+    .eq("symbol", symbol)
+    .eq("exchange", exchange)
+    .maybeSingle();
+
+  if (existing?.expires_at) {
+    const expiresAt = new Date(existing.expires_at).getTime();
+    // "Refresh analysis" is honoured once a report is a week old; before that it is served as-is.
+    const fresh = existing.status === "complete" && !!existing.analyzed_at
+      && Date.now() - new Date(existing.analyzed_at).getTime() < REFRESH_AFTER_MS;
+    // expires_at is set to start + 90 days when a run begins, so it doubles as the start time.
+    const running = existing.status === "analyzing" && Date.now() - (expiresAt - REPORT_TTL_MS) < RUN_TIMEOUT_MS;
+    if (fresh || running) {
+      if (running && email) {
+        await supabase.from("notification_requests").insert({ report_id: existing.id, email });
+      }
+      return NextResponse.json({ ok: true, report_id: existing.id, cached: true });
+    }
   }
 
   // --- Rate limiting ---
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const supabase = createServiceClient();
-  const allowed = await checkRateLimit(ip, supabase);
-  if (!allowed) {
+  if (!(await checkRateLimit(supabase, clientIp(req), "analyze", RATE_LIMIT))) {
     return NextResponse.json(
       { error: `Rate limit reached. Max ${RATE_LIMIT} analyses per hour per IP.` },
       { status: 429 }
@@ -210,7 +236,7 @@ export async function POST(req: Request) {
   } catch { /* non-fatal — analysis is always public */ }
 
   // --- Upsert report ---
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + REPORT_TTL_MS).toISOString();
   const { data: report, error: upsertErr } = await supabase
     .from("reports")
     .upsert(

@@ -20,6 +20,9 @@ interface SerperResult {
 
 // ─── Serper ──────────────────────────────────────────────────────────────────
 
+// Search queries are pinned to the current year so results stay fresh.
+const YEAR = new Date().getFullYear();
+
 async function serper(
   query: string,
   type: "search" | "news" = "search",
@@ -120,13 +123,13 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
     expansion,   // S8 — guidance, con-call transcripts
     sectorTAM,   // S10 — TAM, PLI scheme, government programme
   ] = await Promise.all([
-    serper(`${companyName} order book backlog pipeline crores 2025`, "search", 4),
-    serper(`${companyName} CRISIL ICRA CARE India Ratings credit rating 2025`, "search", 3),
+    serper(`${companyName} order book backlog pipeline crores ${YEAR}`, "search", 4),
+    serper(`${companyName} CRISIL ICRA CARE India Ratings credit rating ${YEAR}`, "search", 3),
     serper(`${companyName} Glassdoor AmbitionBox employee review rating`, "search", 3),
-    serper(`${companyName} order contract award government 2025`, "news", 5),
+    serper(`${companyName} order contract award government ${YEAR}`, "news", 5),
     serper(`${companyName} certification RDSO ISO client Tier-1 government supplier approval`, "search", 3),
     serper(`${companyName} promoter founder background SEBI order CII ASSOCHAM experience`, "search", 3),
-    serper(`${companyName} revenue target expansion plan guidance investor presentation 2025 2026`, "search", 3),
+    serper(`${companyName} revenue target expansion plan guidance investor presentation ${YEAR} ${YEAR + 1}`, "search", 3),
     serper(`${companyName} sector TAM total addressable market PLI scheme NITI Aayog government programme`, "search", 3),
   ]);
 
@@ -154,7 +157,7 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
   console.log(`[search:tavily] Order book crore figure found: ${hasCroreFigure} — ${hasCroreFigure ? "running cross-reference" : "skipping"}`);
 
   const orderBookXRef = hasCroreFigure
-    ? await tavilySearch(`${companyName} order book crores 2025`, 2)
+    ? await tavilySearch(`${companyName} order book crores ${YEAR}`, 2)
     : [];
 
   if (orderBookXRef.length) {
@@ -204,17 +207,17 @@ export async function fetchSignalContext(companyName: string): Promise<string> {
 export async function fetchDeepAnalysisContext(companyName: string): Promise<string> {
   // Step 1 — Serper: 5 targeted searches in parallel
   const [risks, governance, minority, capex, valuation, promoter] = await Promise.all([
-    serper(`${companyName} risks competition regulatory threats sector 2025`, "search", 3),
-    serper(`${companyName} management controversy SEBI action governance fraud 2025`, "search", 3),
+    serper(`${companyName} risks competition regulatory threats sector ${YEAR}`, "search", 3),
+    serper(`${companyName} management controversy SEBI action governance fraud ${YEAR}`, "search", 3),
     serper(`${companyName} related party transactions promoter pledging minority shareholders`, "search", 3),
     serper(`${companyName} acquisition investment capital allocation history`, "search", 3),
     serper(`${companyName} analyst target price EV EBITDA valuation peer comparison`, "search", 3),
-    serper(`${companyName} promoter buying selling shares insider transactions 2025`, "news", 4),
+    serper(`${companyName} promoter buying selling shares insider transactions ${YEAR}`, "news", 4),
   ]);
 
   // Step 2 — Jina: try to extract the MD&A section from the BSE annual report listing
   // (Search for the annual report PDF link first, then extract it)
-  const annualReportSearch = await serper(`${companyName} annual report 2024 2025 BSE NSE PDF investor`, "search", 2);
+  const annualReportSearch = await serper(`${companyName} annual report ${YEAR - 1} ${YEAR} BSE NSE PDF investor`, "search", 2);
   const annualReportUrl = annualReportSearch[0]?.link ?? "";
   const annualReportExtract = annualReportUrl
     ? await jinaExtract(annualReportUrl, 2000)

@@ -2,19 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import ReportView from "@/components/ReportView";
+import ReportView, { type Report } from "@/components/ReportView";
 import ContactCapture from "@/components/ContactCapture";
 import { MAX_SCORE } from "@/lib/signals";
 
 type Status = "loading" | "no-report" | "analyzing" | "has-report";
 
+// Wall-clock read, kept outside the component so render stays pure.
+const now = () => Date.now();
+
 // Skeleton report shown immediately when analysis starts (before first poll returns)
-function makeSkeletonReport(symbol: string, exchange: string, companyName: string) {
+function makeSkeletonReport(symbol: string, exchange: string, companyName: string): Report {
   return {
     id: "", symbol, exchange, company_name: companyName,
     status: "analyzing", total_score: 0, max_score: MAX_SCORE,
     band: "", summary: "", analyzed_at: "", expires_at: "",
-    expired: false, report_signals: [] as any[],
+    expired: false, report_signals: [],
   };
 }
 
@@ -24,7 +27,7 @@ export default function StockPage() {
   const [exchange, symbol] = slug.includes(":") ? slug.split(":") : ["NSE", slug];
 
   const [status, setStatus] = useState<Status>("loading");
-  const [report, setReport] = useState<any>(null);
+  const [report, setReport] = useState<Report | null>(null);
   const [companyName, setCompanyName] = useState(symbol);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -43,7 +46,7 @@ export default function StockPage() {
       if (!quiet) {
         const searchRes = await fetch(`/api/search?q=${symbol}`);
         const instruments = await searchRes.json();
-        const match = instruments.find((i: any) => i.symbol === symbol && i.exchange === exchange) ?? instruments[0];
+        const match = instruments.find((i: { symbol: string; exchange: string }) => i.symbol === symbol && i.exchange === exchange) ?? instruments[0];
         if (match) setCompanyName(match.name);
       }
       setStatus("no-report");
@@ -51,8 +54,8 @@ export default function StockPage() {
       setReport(data);
       setCompanyName(data.company_name ?? companyName);
       setStatus("analyzing");
-      if (analysisStarted.current === null) analysisStarted.current = Date.now();
-      if (Date.now() - analysisStarted.current > ANALYSIS_TIMEOUT_MS) {
+      if (analysisStarted.current === null) analysisStarted.current = now();
+      if (now() - analysisStarted.current > ANALYSIS_TIMEOUT_MS) {
         setError("Analysis is taking longer than expected. Please try again in a moment.");
         setStatus("no-report");
         analysisStarted.current = null;
@@ -90,10 +93,10 @@ export default function StockPage() {
       setSubmitting(false);
       setReport(null); // will show skeleton
       setStatus("analyzing");
-      analysisStarted.current = Date.now();
+      analysisStarted.current = now();
       pollTimer.current = setTimeout(() => fetchReport(true), 2000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       setSubmitting(false);
     }
   };

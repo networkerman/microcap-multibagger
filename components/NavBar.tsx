@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 export default function NavBar() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(undefined); // undefined = loading
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
 
   useEffect(() => {
     const supabase = createClient();

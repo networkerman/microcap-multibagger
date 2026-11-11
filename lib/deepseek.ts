@@ -144,7 +144,7 @@ ${QUESTIONS.map(q => `Q${q.number} (${q.timeref}): ${q.question}`).join("\n")}`;
 // These mirror lib/claude.ts but use DeepSeek's OpenAI-compatible endpoint.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { SIGNALS, getBand, MAX_SCORE, BUSINESS_MODELS, type BusinessModel } from "./signals";
+import { SIGNALS, BUSINESS_MODELS, type BusinessModel } from "./signals";
 
 export interface SignalResult {
   signal_id: string;

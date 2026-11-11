@@ -43,8 +43,8 @@ async function timed(fn: () => Promise<string>): Promise<{ latencyMs: number; de
     const detail = await fn();
     const latencyMs = Date.now() - t;
     return { latencyMs, detail, status: slaStatus(latencyMs) };
-  } catch (err: any) {
-    return { latencyMs: Date.now() - t, detail: err?.message ?? "error", status: "fail" };
+  } catch (err) {
+    return { latencyMs: Date.now() - t, detail: err instanceof Error ? err.message : "error", status: "fail" };
   }
 }
 

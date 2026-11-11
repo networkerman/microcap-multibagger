@@ -3,11 +3,10 @@ import crypto from "crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, report_id } = await req.json() as {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json() as {
     razorpay_order_id: string;
     razorpay_payment_id: string;
     razorpay_signature: string;
-    report_id: string;
   };
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -21,7 +20,9 @@ export async function POST(req: Request) {
     .update(body)
     .digest("hex");
 
-  if (expected !== razorpay_signature) {
+  const given = Buffer.from(razorpay_signature);
+  const wanted = Buffer.from(expected);
+  if (given.length !== wanted.length || !crypto.timingSafeEqual(given, wanted)) {
     return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
   }
 

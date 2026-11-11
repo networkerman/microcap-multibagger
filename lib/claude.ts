@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SIGNALS, getBand, MAX_SCORE, BUSINESS_MODELS, type BusinessModel, type BusinessModelInfo } from "./signals";
+import { SIGNALS, BUSINESS_MODELS, type BusinessModel } from "./signals";
 
 // Three parallel groups. Each group independently classifies the business model
 // and scores its subset of signals. Results are persisted as they arrive,
@@ -30,6 +30,119 @@ export interface AnalysisResult {
 function getClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const ANALYSIS_MODEL = "claude-fable-5-2";
+
+type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"];
+
+// Thinking depth for signal scoring and deep analysis. Override with ANALYSIS_EFFORT.
+function analysisEffort(): Effort {
+  const e = process.env.ANALYSIS_EFFORT as Effort | undefined;
+  return e && EFFORTS.includes(e) ? e : "medium";
+}
+
+// Running token totals for this process, so batch scripts can report spend.
+export const usageTotals = { calls: 0, input_tokens: 0, output_tokens: 0, cache_write_tokens: 0, cache_read_tokens: 0 };
+
+/**
+ * One request to the analysis model. Thinking is always on for this model and
+ * counts against max_tokens, so budgets here are far larger than the visible
+ * answer. Streams so long thinking turns don't hit HTTP timeouts.
+ * Pass `schema` to get JSON that is guaranteed to match it.
+ */
+async function ask(opts: {
+  system: string;
+  prompt: string;
+  maxTokens: number;
+  effort: Effort;
+  schema?: Record<string, unknown>;
+  /** Text placed before the prompt and cached, so later calls that share it read it at a fraction of the price. */
+  cachedPrefix?: string;
+}): Promise<string> {
+  const message = await getClient().beta.messages.stream({
+    model: ANALYSIS_MODEL,
+    max_tokens: opts.maxTokens,
+    // If a safety classifier declines the request, the API re-runs it on a fallback model.
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: {
+      effort: opts.effort,
+      ...(opts.schema ? { format: { type: "json_schema" as const, schema: opts.schema } } : {}),
+    },
+    system: opts.system,
+    messages: [{
+      role: "user",
+      content: opts.cachedPrefix
+        ? [
+            { type: "text", text: opts.cachedPrefix, cache_control: { type: "ephemeral" } },
+            { type: "text", text: opts.prompt },
+          ]
+        : opts.prompt,
+    }],
+  }).finalMessage();
+
+  usageTotals.calls += 1;
+  usageTotals.input_tokens += message.usage.input_tokens;
+  usageTotals.output_tokens += message.usage.output_tokens;
+  usageTotals.cache_write_tokens += message.usage.cache_creation_input_tokens ?? 0;
+  usageTotals.cache_read_tokens += message.usage.cache_read_input_tokens ?? 0;
+
+  if (message.stop_reason === "refusal") {
+    throw new Error(`Model declined the request (${message.stop_details?.category ?? "no category"})`);
+  }
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(`Response truncated at max_tokens=${opts.maxTokens}`);
+  }
+  return message.content.flatMap(b => (b.type === "text" ? [b.text] : [])).join("").trim();
+}
+
+const SIGNAL_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["business_model", "signals"],
+  properties: {
+    business_model: { type: "string", enum: BUSINESS_MODELS.map(m => m.id) },
+    signals: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["signal_id", "label", "score", "max_score", "reasoning", "sources"],
+        properties: {
+          signal_id: { type: "string" },
+          label: { type: "string" },
+          score: { type: "integer" },
+          max_score: { type: "integer" },
+          reasoning: { type: "string" },
+          sources: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  },
+};
+
+const DEEP_ANALYSIS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["questions", "overall_verdict"],
+  properties: {
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["number", "answer"],
+        properties: { number: { type: "integer" }, answer: { type: "string" } },
+      },
+    },
+    overall_verdict: { type: "string" },
+  },
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYSTEM PROMPT
@@ -83,8 +196,7 @@ SCORE: [brief explanation of why the evidence maps to this specific score per th
 
 ─── JSON OUTPUT ───
 
-Return ONLY valid JSON — no markdown fences, no preamble, no trailing text.
-The JSON must be an array of signal objects. Include "business_model" as a string field alongside the array.`;
+Return a single JSON object with "business_model" (string) and "signals" (array), in the shape given in the task.`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -115,7 +227,9 @@ export async function analyzeSignalGroup(
   exchange: string,
   companyName: string,
   signalIds: readonly string[],
-  dataContext = ""
+  dataContext = "",
+  /** Cache the company data across calls. Only pays off when one call finishes before the rest start. */
+  cacheContext = false
 ): Promise<{ signals: SignalResult[]; businessModel: BusinessModel | null }> {
   const signals = SIGNALS
     .filter(s => signalIds.includes(s.id))
@@ -147,9 +261,9 @@ export async function analyzeSignalGroup(
     ? `\n${dataContext}\n\nUse the verified data above as your primary source. Do not contradict these numbers.\n`
     : "";
 
-  const prompt = `Analyse: ${companyName} (${symbol}, ${exchange})
-${dataSection}
-─── TASK ───
+  const header = `Analyse: ${companyName} (${symbol}, ${exchange})
+${dataSection}`;
+  const task = `─── TASK ───
 1. Classify this company's business model from the list in the system prompt.
 2. Score ALL ${signals.length} of the following signals using the verification steps defined for each.
 3. Return a JSON object with "business_model" (string) and "signals" (array).
@@ -173,37 +287,35 @@ Return a single JSON object in exactly this shape (no markdown, no preamble):
   ]
 }`;
 
-  const message = await getClient().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 3000,
+  const text = await ask({
     system: buildSystemPrompt(),
-    messages: [{ role: "user", content: prompt }],
+    ...(cacheContext ? { cachedPrefix: header, prompt: task } : { prompt: header + "\n" + task }),
+    maxTokens: 16000,
+    effort: analysisEffort(),
+    schema: SIGNAL_RESPONSE_SCHEMA,
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
-  const json = text.replace(/^```json\n?/m, "").replace(/\n?```$/m, "").trim();
+  const parsed = JSON.parse(text) as GroupAnalysisResponse;
 
-  try {
-    // Try parsing as object with signals array + business_model
-    const parsed = JSON.parse(json);
-
-    if (parsed.signals && Array.isArray(parsed.signals)) {
-      // New format: { business_model, signals: [...] }
-      return {
-        businessModel: parsed.business_model ?? null,
-        signals: parsed.signals as SignalResult[],
-      };
-    }
-
-    // Fallback: old format — plain array. Signals won't have business model.
-    if (Array.isArray(parsed)) {
-      return { businessModel: null, signals: parsed as SignalResult[] };
-    }
-
-    return { businessModel: null, signals: [] };
-  } catch {
-    return { businessModel: null, signals: [] };
+  // Trust the framework definition, not the model, for label and max; keep
+  // scores inside the rubric's range and drop anything that wasn't asked for.
+  const defs = new Map(SIGNALS.filter(s => signalIds.includes(s.id)).map(s => [s.id, s]));
+  const seen = new Set<string>();
+  const cleaned: SignalResult[] = [];
+  for (const r of parsed.signals) {
+    const def = defs.get(r.signal_id);
+    if (!def || seen.has(def.id)) continue;
+    seen.add(def.id);
+    cleaned.push({
+      signal_id: def.id,
+      label: def.label,
+      score: Math.min(def.max, Math.max(0, Math.round(r.score))),
+      max_score: def.max,
+      reasoning: r.reasoning,
+      sources: r.sources ?? [],
+    });
   }
+  return { businessModel: parsed.business_model ?? null, signals: cleaned };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -257,7 +369,7 @@ Rules:
 5. Length per answer: 4–8 sentences. Dense with facts, not padded with platitudes.
 6. For the overall_verdict: 2–3 sentences summarising the honest investment case.
 
-Return ONLY a valid JSON object — no markdown fences, no preamble.`;
+Return a single JSON object in the shape given in the task.`;
 
 export async function runDeepAnalysis(
   symbol: string,
@@ -288,30 +400,16 @@ Answer each of the following 15 questions about this specific company. Return a 
 The 15 questions:
 ${DEEP_ANALYSIS_QUESTIONS.map(q => `Q${q.number} (${q.timeref}): ${q.question}`).join("\n")}`;
 
-  const message = await getClient().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8000,
+  const raw = await ask({
     system: DEEP_ANALYSIS_SYSTEM,
-    messages: [{ role: "user", content: prompt }],
+    prompt,
+    maxTokens: 32000,
+    effort: analysisEffort(),
+    schema: DEEP_ANALYSIS_SCHEMA,
   });
+  console.log(`[claude:deep-analysis] Response in ${((Date.now() - t0) / 1000).toFixed(1)}s | ${raw.length} chars`);
 
-  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
-  const stopReason = message.stop_reason;
-  console.log(`[claude:deep-analysis] Response in ${((Date.now() - t0) / 1000).toFixed(1)}s | stop_reason=${stopReason} | ${raw.length} chars`);
-
-  if (stopReason === "max_tokens") {
-    console.warn(`[claude:deep-analysis] Response truncated at max_tokens — consider increasing budget`);
-  }
-
-  const json = raw.replace(/^```json\s*/m, "").replace(/\s*```\s*$/m, "").trim();
-
-  let parsed: { questions: { number: number; answer: string }[]; overall_verdict: string };
-  try {
-    parsed = JSON.parse(json);
-  } catch (err) {
-    console.error(`[claude:deep-analysis] JSON parse failed:`, err, `— raw: ${raw.slice(0, 300)}`);
-    throw new Error(`Claude returned unparseable JSON for deep analysis: ${String(err)}`);
-  }
+  const parsed = JSON.parse(raw) as { questions: { number: number; answer: string }[]; overall_verdict: string };
 
   const answerMap = new Map(parsed.questions.map(q => [q.number, q.answer]));
 
@@ -350,12 +448,5 @@ ${signals.map(s => `${s.signal_id} ${s.label}: ${s.score}/${s.max_score} — ${s
 
 Write a 3-5 sentence investment thesis summary: strongest signals, biggest risks, and overall conviction. Be specific and direct. Return plain text only.`;
 
-  const message = await getClient().messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 400,
-    system: SUMMARY_SYSTEM,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  return message.content[0].type === "text" ? message.content[0].text.trim() : "";
+  return ask({ system: SUMMARY_SYSTEM, prompt, maxTokens: 4000, effort: "low" });
 }

@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import { fetchEquityInstruments } from "@/lib/kite";
 import { createServiceClient } from "@/lib/supabase/server";
 
+export const maxDuration = 300;
+
 // Syncs NSE + BSE EQ instruments from Kite into Supabase.
-// Called once on deploy and then daily via a cron or Vercel cron job.
-// Protected by a secret token to prevent public triggering.
-export async function POST(req: Request) {
+// Runs daily from Vercel Cron (GET, authorised with CRON_SECRET) and can be
+// triggered by hand (POST, authorised with SYNC_SECRET).
+function authorised(req: Request): boolean {
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.SYNC_SECRET}`) {
+  const secrets = [process.env.SYNC_SECRET, process.env.CRON_SECRET].filter(Boolean);
+  return secrets.some(secret => auth === `Bearer ${secret}`);
+}
+
+export const GET = sync;
+export const POST = sync;
+
+async function sync(req: Request) {
+  if (!authorised(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

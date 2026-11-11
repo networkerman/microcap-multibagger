@@ -56,8 +56,8 @@ export async function POST(req: Request) {
       currency: "INR",
       key_id: process.env.RAZORPAY_KEY_ID,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Razorpay create-order error:", err);
-    return NextResponse.json({ error: err.message ?? "Order creation failed" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Order creation failed" }, { status: 500 });
   }
 }
